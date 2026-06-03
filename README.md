@@ -4,7 +4,21 @@
 
 Demo video: [`assets/demo.mp4`](assets/demo.mp4)
 
-A Chrome-compatible Manifest V3 extension that turns generic vertical manga chapter pages into a Kindle-like reader. It is built for manga/fansub sites that usually render every page as one long scroll, without hardcoding support for a specific domain.
+Did you know many manga artists compose key moments as two-page spreads? If you read on typical fansub sites, you are probably missing many of them because most of those pages only show one long, vertical, single-page scroll.
+
+Prettify Manga Reader restores more of the artist's original intent. It turns ugly, ad-bloated manga websites into a modern dark-mode reader with fitted pages, joined two-page spreads, keyboard navigation, and clean controls. It is generic by design, so it works across most manga sites instead of being hardcoded to one domain.
+
+## Before: the usual fansub page
+
+Most sites bury manga pages inside a bright, cluttered layout and make you scroll one page at a time.
+
+![A typical manga fansub page before enabling the extension, with the manga page surrounded by the original website layout.](assets/screenshot-before.webp)
+
+## After: a dark reader that restores spreads
+
+The extension opens a dark overlay, fits the art to the viewport, and joins pages at the center seam when Book or Double mode is active.
+
+![Prettify Manga Reader showing a joined two-page manga spread in a dark full-screen reader.](assets/screenshot-reader.webp)
 
 ## What it does
 
