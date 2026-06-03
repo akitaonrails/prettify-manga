@@ -1,0 +1,365 @@
+html.pmr-reader-active,
+html.pmr-reader-active body {
+  overflow: hidden !important;
+}
+
+#pmr-reader-root,
+#pmr-reader-root *,
+#pmr-reader-root *::before,
+#pmr-reader-root *::after,
+#pmr-reader-activator,
+#pmr-reader-activator *,
+#pmr-reader-toast {
+  box-sizing: border-box !important;
+}
+
+#pmr-reader-root {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #050505 !important;
+  color: #f6f6f6 !important;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  line-height: 1.35 !important;
+  isolation: isolate !important;
+}
+
+#pmr-reader-root .pmr-scroll {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  scroll-behavior: smooth !important;
+  scroll-snap-type: y mandatory !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.055), transparent 34rem),
+    #050505 !important;
+}
+
+#pmr-reader-root.pmr-snap-off .pmr-scroll {
+  scroll-snap-type: none !important;
+}
+
+#pmr-reader-root .pmr-spread {
+  min-height: 100vh !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 54px clamp(12px, 2vw, 32px) 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: clamp(8px, 1.4vw, 22px) !important;
+  scroll-snap-align: start !important;
+  scroll-snap-stop: always !important;
+}
+
+#pmr-reader-root .pmr-page {
+  height: calc(100vh - 78px) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+#pmr-reader-root.pmr-mode-single .pmr-page,
+#pmr-reader-root .pmr-spread.pmr-singleton .pmr-page {
+  flex: 0 1 min(100%, 1180px) !important;
+  max-width: calc(100vw - clamp(24px, 4vw, 64px)) !important;
+}
+
+#pmr-reader-root .pmr-spread.pmr-landscape.pmr-singleton .pmr-page {
+  flex: 0 1 calc(100vw - clamp(24px, 4vw, 64px)) !important;
+  width: calc(100vw - clamp(24px, 4vw, 64px)) !important;
+  max-width: calc(100vw - clamp(24px, 4vw, 64px)) !important;
+}
+
+#pmr-reader-root.pmr-mode-double .pmr-spread:not(.pmr-singleton) .pmr-page,
+#pmr-reader-root.pmr-mode-book .pmr-spread:not(.pmr-singleton) .pmr-page {
+  flex: 1 1 0 !important;
+  max-width: calc(50vw - clamp(18px, 3vw, 48px)) !important;
+}
+
+#pmr-reader-root.pmr-mode-double .pmr-spread:not(.pmr-singleton),
+#pmr-reader-root.pmr-mode-book .pmr-spread:not(.pmr-singleton) {
+  gap: 0 !important;
+  filter: drop-shadow(0 16px 48px rgba(0, 0, 0, 0.42)) !important;
+}
+
+#pmr-reader-root.pmr-mode-double .pmr-spread:not(.pmr-singleton) .pmr-page:first-child,
+#pmr-reader-root.pmr-mode-book .pmr-spread:not(.pmr-singleton) .pmr-page:first-child {
+  justify-content: flex-end !important;
+}
+
+#pmr-reader-root.pmr-mode-double .pmr-spread:not(.pmr-singleton) .pmr-page:last-child,
+#pmr-reader-root.pmr-mode-book .pmr-spread:not(.pmr-singleton) .pmr-page:last-child {
+  justify-content: flex-start !important;
+}
+
+#pmr-reader-root .pmr-page img {
+  display: block !important;
+  width: auto !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 2px !important;
+  background: #111 !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42) !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+}
+
+#pmr-reader-root.pmr-mode-double .pmr-spread:not(.pmr-singleton) .pmr-page img,
+#pmr-reader-root.pmr-mode-book .pmr-spread:not(.pmr-singleton) .pmr-page img {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+#pmr-reader-root .pmr-chapter-nav-spread {
+  padding-inline: clamp(18px, 4vw, 72px) !important;
+}
+
+#pmr-reader-root .pmr-chapter-nav-card {
+  width: min(680px, 100%) !important;
+  padding: clamp(22px, 4vw, 42px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 22px !important;
+  background: rgba(18, 18, 20, 0.86) !important;
+  color: #f7f7f7 !important;
+  text-align: center !important;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.46) !important;
+  backdrop-filter: blur(16px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(130%) !important;
+}
+
+#pmr-reader-root .pmr-chapter-nav-card h2 {
+  all: unset !important;
+  display: block !important;
+  margin: 0 0 8px !important;
+  color: #fff !important;
+  font: 760 clamp(22px, 3vw, 32px)/1.15 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+#pmr-reader-root .pmr-chapter-nav-card p {
+  margin: 0 0 22px !important;
+  color: rgba(255, 255, 255, 0.72) !important;
+  font: 520 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+#pmr-reader-root .pmr-chapter-nav-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  gap: 10px !important;
+}
+
+#pmr-reader-root .pmr-chapter-link {
+  min-height: 42px !important;
+  padding: 0 18px !important;
+  text-decoration: none !important;
+  font-size: 14px !important;
+}
+
+#pmr-reader-root .pmr-chapter-link-next {
+  background: rgba(73, 133, 255, 0.92) !important;
+}
+
+#pmr-reader-root .pmr-toolbar {
+  position: fixed !important;
+  top: 10px !important;
+  right: 10px !important;
+  z-index: 2 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  max-width: calc(100vw - 20px) !important;
+  padding: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 999px !important;
+  background: rgba(18, 18, 18, 0.72) !important;
+  color: #f7f7f7 !important;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34) !important;
+  backdrop-filter: blur(14px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(130%) !important;
+  opacity: 0.88 !important;
+  transition: opacity 160ms ease, transform 160ms ease !important;
+}
+
+#pmr-reader-root .pmr-toolbar:hover,
+#pmr-reader-root .pmr-toolbar:focus-within {
+  opacity: 1 !important;
+}
+
+#pmr-reader-root .pmr-button,
+#pmr-reader-activator .pmr-button {
+  all: unset !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 30px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  font: 600 12px/1 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: 0.01em !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  white-space: nowrap !important;
+}
+
+#pmr-reader-root .pmr-button:hover,
+#pmr-reader-root .pmr-button:focus-visible,
+#pmr-reader-activator .pmr-button:hover,
+#pmr-reader-activator .pmr-button:focus-visible {
+  background: rgba(255, 255, 255, 0.2) !important;
+  outline: 2px solid rgba(255, 255, 255, 0.32) !important;
+  outline-offset: 2px !important;
+}
+
+#pmr-reader-root .pmr-button-primary,
+#pmr-reader-activator .pmr-button-primary {
+  background: rgba(73, 133, 255, 0.92) !important;
+}
+
+#pmr-reader-root .pmr-indicator {
+  min-width: 72px !important;
+  padding: 0 6px !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  font: 650 12px/1 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+#pmr-reader-root .pmr-help-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 3 !important;
+  display: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  background: rgba(0, 0, 0, 0.66) !important;
+}
+
+#pmr-reader-root.pmr-help-open .pmr-help-backdrop {
+  display: flex !important;
+}
+
+#pmr-reader-root .pmr-help-dialog {
+  width: min(560px, 100%) !important;
+  max-height: min(720px, calc(100vh - 48px)) !important;
+  overflow: auto !important;
+  padding: 22px !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 18px !important;
+  background: rgba(18, 18, 20, 0.94) !important;
+  color: #f7f7f7 !important;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.58) !important;
+}
+
+#pmr-reader-root .pmr-help-dialog h2 {
+  all: unset !important;
+  display: block !important;
+  margin: 0 0 14px !important;
+  color: #fff !important;
+  font: 750 20px/1.2 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+#pmr-reader-root .pmr-help-dialog p,
+#pmr-reader-root .pmr-help-dialog li {
+  color: rgba(255, 255, 255, 0.82) !important;
+  font: 500 14px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+#pmr-reader-root .pmr-help-dialog ul {
+  margin: 10px 0 18px !important;
+  padding-left: 22px !important;
+}
+
+#pmr-reader-root .pmr-help-dialog kbd {
+  display: inline-block !important;
+  min-width: 1.65em !important;
+  margin: 0 2px !important;
+  padding: 2px 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.32) !important;
+  border-radius: 6px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  font: 700 12px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  text-align: center !important;
+}
+
+#pmr-reader-activator {
+  position: fixed !important;
+  top: 12px !important;
+  right: 12px !important;
+  z-index: 2147483646 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 999px !important;
+  background: rgba(18, 18, 18, 0.64) !important;
+  color: #fff !important;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.28) !important;
+  backdrop-filter: blur(14px) saturate(130%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(130%) !important;
+  opacity: 0.78 !important;
+}
+
+#pmr-reader-activator:hover,
+#pmr-reader-activator:focus-within {
+  opacity: 1 !important;
+}
+
+#pmr-reader-toast {
+  position: fixed !important;
+  left: 50% !important;
+  bottom: 22px !important;
+  z-index: 2147483647 !important;
+  transform: translateX(-50%) !important;
+  max-width: min(560px, calc(100vw - 32px)) !important;
+  padding: 10px 14px !important;
+  border-radius: 999px !important;
+  background: rgba(20, 20, 20, 0.9) !important;
+  color: #fff !important;
+  font: 650 13px/1.25 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.42) !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 720px) {
+  #pmr-reader-root .pmr-toolbar {
+    left: 8px !important;
+    right: 8px !important;
+    justify-content: center !important;
+    overflow-x: auto !important;
+    border-radius: 16px !important;
+  }
+
+  #pmr-reader-root .pmr-spread {
+    padding-top: 64px !important;
+  }
+
+  #pmr-reader-root.pmr-mode-double .pmr-spread:not(.pmr-singleton),
+  #pmr-reader-root.pmr-mode-book .pmr-spread:not(.pmr-singleton) {
+    gap: 0 !important;
+  }
+}
