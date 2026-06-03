@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Start the reader in Book mode every time it opens.
+- Suspend the underlying page from normal painting while the overlay is active instead of deleting site DOM.
+- Added regression coverage for the default startup mode.
+
 ## 0.2.0
 
 - Added a generic Chrome MV3 manga reader overlay.

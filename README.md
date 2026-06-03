@@ -11,6 +11,7 @@ A Chrome-compatible Manifest V3 extension that turns generic vertical manga chap
 - Adds a toggleable full-screen reader overlay.
 - Fits each manga page to the available screen space.
 - Supports Single, Double, and Book spread modes.
+- Starts in Book mode whenever the reader opens: first page alone, then double-page spreads.
 - Joins paired pages in the middle for seamless two-page art spreads.
 - Keeps already-horizontal spread images as single full-width spreads.
 - Uses scroll snapping so page/spread navigation lands cleanly.
@@ -60,9 +61,11 @@ You can also load this repository directory directly while developing.
 
 - **Single**: one fitted page per screen.
 - **Double**: pairs portrait pages side-by-side from the start.
-- **Book**: keeps the first page alone, then pairs the rest.
+- **Book**: keeps the first page alone, then pairs the rest. This is the mode used each time the reader opens.
 
 Horizontal images, such as scans that already contain a two-page spread, stay as one full-width spread in Double and Book modes.
+
+While the reader is active, the original page is not deleted. It is hidden and suspended from normal painting behind the overlay, which is safer for toggling off and avoids breaking site scripts while reducing unnecessary background rendering.
 
 ## Generic detection approach
 

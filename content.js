@@ -10,6 +10,7 @@
   const ACTIVATOR_ID = "pmr-reader-activator";
   const TOAST_ID = "pmr-reader-toast";
   const STORAGE_KEY = "pmr.settings.v1";
+  const DEFAULT_READER_MODE = "book";
   const MODES = ["single", "double", "book"];
   const MODE_LABELS = {
     single: "Single",
@@ -70,7 +71,7 @@
   const TOAST_DURATION_MS = 2200;
 
   let settings = {
-    mode: "single",
+    mode: DEFAULT_READER_MODE,
     snap: true
   };
   let settingsLoaded = false;
@@ -164,6 +165,7 @@
 
     pages = detected;
     chapterNav = detectChapterNav();
+    settings.mode = DEFAULT_READER_MODE;
     active = true;
     currentSpreadIndex = 0;
     removeActivator();
@@ -1489,6 +1491,7 @@
 
   if (window.__PMR_ENABLE_TEST_API__) {
     window.__PMR_TEST_API__ = {
+      DEFAULT_READER_MODE,
       buildSpreads,
       chapterInfoFromText,
       chapterInfoFromUrl,

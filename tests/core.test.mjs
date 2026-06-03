@@ -47,6 +47,11 @@ function plain(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+test("default startup mode is book", () => {
+  const api = loadApi();
+  assert.equal(api.DEFAULT_READER_MODE, "book");
+});
+
 test("spread builder keeps horizontal scans singleton in double mode", () => {
   const api = loadApi();
   api.setChapterNavForTest(null);

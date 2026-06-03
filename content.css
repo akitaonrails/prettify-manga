@@ -3,6 +3,12 @@ html.pmr-reader-active body {
   overflow: hidden !important;
 }
 
+html.pmr-reader-active body > * {
+  content-visibility: hidden !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
 #pmr-reader-root,
 #pmr-reader-root *,
 #pmr-reader-root *::before,
