@@ -42,6 +42,32 @@
     "160x600",
     "120x600"
   ]);
+  // Heuristic thresholds live here so release audits can reason about them
+  // without hunting through detection, layout, and navigation code.
+  const MIN_DETECTED_PAGES = 3;
+  const LANDSCAPE_SPREAD_RATIO = 1.12;
+  const MAX_SELECTED_PAGES = 240;
+  const MAX_REASONABLE_PAGE_NUMBER = 240;
+  const EMBEDDED_SCAN_MAX_BYTES = 2_000_000;
+  const EMBEDDED_SCRIPT_MAX_BYTES = 700_000;
+  const CHAPTER_NAV_HIGH_CONFIDENCE = 80;
+  const CHAPTER_NAV_CONTEXT_CONFIDENCE = 45;
+  const CHAPTER_NAV_REL_SCORE = 110;
+  const CHAPTER_NAV_TEXT_SCORE = 85;
+  const CHAPTER_NAV_SCOPE_SIGNAL_SCORE = 45;
+  const CHAPTER_NAV_ICON_CONTEXT_SCORE = 35;
+  const CHAPTER_NAV_ICON_WEAK_SCORE = 15;
+  const CHAPTER_NAV_WRONG_DIRECTION_PENALTY = 70;
+  const CHAPTER_NAV_HTML_SAMPLE_CHARS = 900;
+  const READABLE_TITLE_MAX_CHARS = 80;
+  const ELEMENT_SIGNATURE_MAX_CHARS = 80;
+  const ACTIVATOR_INITIAL_DELAY_MS = 700;
+  const ACTIVATOR_PAGESHOW_DELAY_MS = 500;
+  const ACTIVATOR_AFTER_CLOSE_DELAY_MS = 400;
+  const ACTIVATOR_MUTATION_DELAY_MS = 900;
+  const ACTIVATOR_MAX_MUTATION_REFRESHES = 12;
+  const LAYOUT_REFRESH_DELAY_MS = 80;
+  const TOAST_DURATION_MS = 2200;
 
   let settings = {
     mode: "single",
@@ -61,9 +87,9 @@
   let layoutRefreshTimer = 0;
 
   loadSettings();
-  scheduleActivatorRefresh(700);
+  scheduleActivatorRefresh(ACTIVATOR_INITIAL_DELAY_MS);
   observeEarlyMutations();
-  window.addEventListener("pageshow", () => scheduleActivatorRefresh(500), { passive: true });
+  window.addEventListener("pageshow", () => scheduleActivatorRefresh(ACTIVATOR_PAGESHOW_DELAY_MS), { passive: true });
 
   if (chrome?.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -131,7 +157,7 @@
     window.clearTimeout(activatorRefreshTimer);
 
     const detected = collectMangaPages({ includeEmbedded: true });
-    if (detected.length < 3) {
+    if (detected.length < MIN_DETECTED_PAGES) {
       showToast("No manga page sequence found on this page.");
       return;
     }
@@ -193,7 +219,7 @@
     document.removeEventListener("keydown", handleKeyDown, true);
     document.documentElement.classList.remove("pmr-reader-active");
     removeReaderRoot();
-    scheduleActivatorRefresh(400);
+    scheduleActivatorRefresh(ACTIVATOR_AFTER_CLOSE_DELAY_MS);
   }
 
   function removeReaderRoot() {
@@ -443,7 +469,7 @@
   function isLandscapePage(page) {
     const width = Number(page?.width || 0);
     const height = Number(page?.height || 0);
-    return width > 0 && height > 0 && width / height >= 1.12;
+    return width > 0 && height > 0 && width / height >= LANDSCAPE_SPREAD_RATIO;
   }
 
   function recordLoadedPageSize(pageIndex, image) {
@@ -470,7 +496,7 @@
       }
       const currentPage = spreads[currentSpreadIndex]?.pageIndexes?.[0] ?? pageIndex;
       renderSpreads(currentPage);
-    }, 80);
+    }, LAYOUT_REFRESH_DELAY_MS);
   }
 
   function spreadLabel(spread) {
@@ -617,23 +643,23 @@
     const navish = isNavishElement(element);
     const nearChapterSelect = hasNearbyChapterSelect(element);
     const scopeText = `${text} ${ancestorNavText(element)}`.toLowerCase();
-    const elementHtml = element.outerHTML ? element.outerHTML.slice(0, 900).toLowerCase() : "";
+    const elementHtml = element.outerHTML ? element.outerHTML.slice(0, CHAPTER_NAV_HTML_SAMPLE_CHARS).toLowerCase() : "";
     const scores = { prev: 0, next: 0 };
 
-    if (/\bprev(?:ious)?\b/.test(rel)) scores.prev += 110;
-    if (/\bnext\b/.test(rel)) scores.next += 110;
+    if (/\bprev(?:ious)?\b/.test(rel)) scores.prev += CHAPTER_NAV_REL_SCORE;
+    if (/\bnext\b/.test(rel)) scores.next += CHAPTER_NAV_REL_SCORE;
 
     if (/\b(prev(?:ious)?|back|older)\b(?:\s*(?:chapter|chap|ch|episode|ep))?|\b(?:chapter|chap|ch|episode|ep)\s*(?:prev(?:ious)?|back)\b/i.test(text)) {
-      scores.prev += 85;
+      scores.prev += CHAPTER_NAV_TEXT_SCORE;
     }
     if (/\b(next|newer)\b(?:\s*(?:chapter|chap|ch|episode|ep))?|\b(?:chapter|chap|ch|episode|ep)\s*next\b/i.test(text)) {
-      scores.next += 85;
+      scores.next += CHAPTER_NAV_TEXT_SCORE;
     }
 
-    if (/nav-previous|\bprevious\b|\bprev\b|pagination-prev|chevron-left|arrow-left/.test(scopeText)) scores.prev += 45;
-    if (/nav-next|\bnext\b|pagination-next|chevron-right|arrow-right/.test(scopeText)) scores.next += 45;
-    if (/chevron-left|arrow-left|lucide-chevron-left|lucide-arrow-left/.test(elementHtml)) scores.prev += nearChapterSelect || navish ? 35 : 15;
-    if (/chevron-right|arrow-right|lucide-chevron-right|lucide-arrow-right/.test(elementHtml)) scores.next += nearChapterSelect || navish ? 35 : 15;
+    if (/nav-previous|\bprevious\b|\bprev\b|pagination-prev|chevron-left|arrow-left/.test(scopeText)) scores.prev += CHAPTER_NAV_SCOPE_SIGNAL_SCORE;
+    if (/nav-next|\bnext\b|pagination-next|chevron-right|arrow-right/.test(scopeText)) scores.next += CHAPTER_NAV_SCOPE_SIGNAL_SCORE;
+    if (/chevron-left|arrow-left|lucide-chevron-left|lucide-arrow-left/.test(elementHtml)) scores.prev += nearChapterSelect || navish ? CHAPTER_NAV_ICON_CONTEXT_SCORE : CHAPTER_NAV_ICON_WEAK_SCORE;
+    if (/chevron-right|arrow-right|lucide-chevron-right|lucide-arrow-right/.test(elementHtml)) scores.next += nearChapterSelect || navish ? CHAPTER_NAV_ICON_CONTEXT_SCORE : CHAPTER_NAV_ICON_WEAK_SCORE;
 
     if (currentInfo && targetInfo && currentInfo.family === targetInfo.family && targetInfo.number !== currentInfo.number) {
       const delta = targetInfo.number - currentInfo.number;
@@ -642,14 +668,14 @@
       if (delta < 0) scores.prev += navish || nearChapterSelect ? deltaScore : 15;
       if (delta > 0) scores.next += navish || nearChapterSelect ? deltaScore : 15;
 
-      if (delta < 0) scores.next -= 70;
-      if (delta > 0) scores.prev -= 70;
+      if (delta < 0) scores.next -= CHAPTER_NAV_WRONG_DIRECTION_PENALTY;
+      if (delta > 0) scores.prev -= CHAPTER_NAV_WRONG_DIRECTION_PENALTY;
     }
 
     const direction = scores.next > scores.prev ? "next" : "prev";
     const score = scores[direction];
-    const highConfidence = score >= 80;
-    const contextualConfidence = (navish || nearChapterSelect) && score >= 45;
+    const highConfidence = score >= CHAPTER_NAV_HIGH_CONFIDENCE;
+    const contextualConfidence = (navish || nearChapterSelect) && score >= CHAPTER_NAV_CONTEXT_CONFIDENCE;
     if (!highConfidence && !contextualConfidence) {
       return null;
     }
@@ -734,7 +760,7 @@
 
   function readableChapterNavTitle(element, url, direction) {
     const text = chapterNavText(element);
-    if (text && text.length <= 80 && /[a-z0-9]/i.test(text)) {
+    if (text && text.length <= READABLE_TITLE_MAX_CHARS && /[a-z0-9]/i.test(text)) {
       return text;
     }
     const info = chapterInfoFromUrl(url.href);
@@ -920,7 +946,7 @@
 
   function scanEmbeddedImageUrls(upsert) {
     let scannedBytes = 0;
-    const maxBytes = 2_000_000;
+    const maxBytes = EMBEDDED_SCAN_MAX_BYTES;
     const textNodes = [
       ...document.querySelectorAll("noscript"),
       ...document.querySelectorAll("script:not([src])")
@@ -934,7 +960,7 @@
       if (!/\.(?:jpe?g|png|webp|avif)|\/api\/img\//i.test(text)) {
         continue;
       }
-      if (text.length > 700_000 && node.tagName.toLowerCase() !== "noscript" && node.id !== "__NEXT_DATA__") {
+      if (text.length > EMBEDDED_SCRIPT_MAX_BYTES && node.tagName.toLowerCase() !== "noscript" && node.id !== "__NEXT_DATA__") {
         continue;
       }
       const normalizedText = text.replace(/\\\//g, "/").replace(/\\u002F/gi, "/");
@@ -1070,7 +1096,7 @@
       }
     });
 
-    return [...byPage.values(), ...withoutPage].slice(0, 240);
+    return [...byPage.values(), ...withoutPage].slice(0, MAX_SELECTED_PAGES);
   }
 
   function compareCandidates(a, b) {
@@ -1119,7 +1145,7 @@
     }
 
     match = base.match(/^0*(\d{1,3})[-_.\s]+(.+)$/);
-    if (match && (Number(match[1]) <= 240 || /(?:chapter|chap|manga|page|comic)/i.test(base))) {
+    if (match && (Number(match[1]) <= MAX_REASONABLE_PAGE_NUMBER || /(?:chapter|chap|manga|page|comic)/i.test(base))) {
       const rest = match[2].replace(/\d+/g, "#");
       if (/^\d{4,}[-_.\s]+0*\d{1,3}$/i.test(base)) {
         const trailing = base.match(/^(.+[-_.\s])0*(\d{1,3})$/);
@@ -1221,10 +1247,6 @@
     return `${url.origin}${path}${normalizedSearch(url.searchParams)}`.toLowerCase();
   }
 
-  function preferredImageUrl(a, b) {
-    return imageUrlQuality(a) >= imageUrlQuality(b) ? a : b;
-  }
-
   function imageUrlQuality(urlValue) {
     const url = safeUrl(urlValue);
     if (!url) {
@@ -1290,7 +1312,7 @@
     }
     const tag = element.tagName.toLowerCase();
     if (element.id) {
-      return `${tag}#${element.id.slice(0, 80)}`;
+      return `${tag}#${element.id.slice(0, ELEMENT_SIGNATURE_MAX_CHARS)}`;
     }
     const classes = Array.from(element.classList || [])
       .filter((className) => !/^\d/.test(className) && className.length <= 48)
@@ -1385,7 +1407,7 @@
       return;
     }
     const detected = collectMangaPages({ includeEmbedded: false });
-    if (detected.length >= 3) {
+    if (detected.length >= MIN_DETECTED_PAGES) {
       showActivator(detected.length);
     } else {
       removeActivator();
@@ -1398,7 +1420,9 @@
       activator = document.createElement("div");
       activator.id = ACTIVATOR_ID;
       activator.innerHTML = '<button class="pmr-button pmr-button-primary" type="button">Reader</button>';
-      activator.addEventListener("click", () => activateReader());
+      activator.addEventListener("click", () => {
+        toggleReader();
+      });
       document.documentElement.appendChild(activator);
     }
     const button = activator.querySelector("button");
@@ -1422,8 +1446,8 @@
         return;
       }
       refreshes += 1;
-      scheduleActivatorRefresh(900);
-      if (refreshes > 12) {
+      scheduleActivatorRefresh(ACTIVATOR_MUTATION_DELAY_MS);
+      if (refreshes > ACTIVATOR_MAX_MUTATION_REFRESHES) {
         mutationObserver.disconnect();
         mutationObserver = null;
       }
@@ -1440,7 +1464,7 @@
     }
     toast.textContent = message;
     window.clearTimeout(showToast.timer);
-    showToast.timer = window.setTimeout(() => toast.remove(), 2200);
+    showToast.timer = window.setTimeout(() => toast.remove(), TOAST_DURATION_MS);
   }
 
   function helpDialogMarkup() {
@@ -1461,5 +1485,20 @@
         <button class="pmr-button pmr-button-primary" type="button" data-pmr-action="help-close">Close</button>
       </div>
     `;
+  }
+
+  if (window.__PMR_ENABLE_TEST_API__) {
+    window.__PMR_TEST_API__ = {
+      buildSpreads,
+      chapterInfoFromText,
+      chapterInfoFromUrl,
+      isBadChapterNavLink,
+      isLandscapePage,
+      logicalImageKey,
+      parseNumericInfo,
+      setChapterNavForTest(value) {
+        chapterNav = value;
+      }
+    };
   }
 })();

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run checks and tests
+        run: npm test
+
+      - name: Package extension
+        run: npm run package
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromium-extension
+          path: dist/prettify-manga-reader-*.zip

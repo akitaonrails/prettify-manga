@@ -1,0 +1,13 @@
+{
+  "name": "prettify-manga-reader",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "validate": "node scripts/validate.mjs",
+    "check:js": "node --check background.js && node --check content.js && node --check scripts/package.mjs && node --check scripts/validate.mjs && node --check tests/core.test.mjs",
+    "test:unit": "node --test tests/*.test.mjs",
+    "test": "npm run validate && npm run check:js && npm run test:unit",
+    "package": "node scripts/package.mjs"
+  }
+}

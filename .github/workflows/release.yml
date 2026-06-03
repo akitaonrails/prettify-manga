@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-extension:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run checks and tests
+        run: npm test
+
+      - name: Package extension
+        run: npm run package
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromium-extension
+          path: dist/prettify-manga-reader-*.zip
+
+  create-release:
+    needs: build-extension
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Load release notes
+        id: notes
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          NOTES_FILE="releases/${TAG}.md"
+          if [ -f "$NOTES_FILE" ]; then
+            BODY="$(cat "$NOTES_FILE")"
+          else
+            BODY="$(awk -v version="$VERSION" '
+              $0 == "## " version { capture=1; next }
+              capture && $0 ~ /^## / { exit }
+              capture { print }
+            ' CHANGELOG.md)"
+          fi
+          if [ -z "$BODY" ]; then
+            BODY="Release ${TAG}"
+          fi
+          BODY="${BODY}
+
+          ## Install
+
+          1. Download \`prettify-manga-reader-${VERSION}.zip\` from this release.
+          2. Unzip it into a permanent directory.
+          3. Open \`chrome://extensions\` or \`brave://extensions\`.
+          4. Enable **Developer mode**.
+          5. Click **Load unpacked** and select the unzipped directory."
+          echo "body<<RELEASE_EOF" >> "$GITHUB_OUTPUT"
+          echo "$BODY" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.notes.outputs.body }}
+          files: artifacts/prettify-manga-reader-*.zip
