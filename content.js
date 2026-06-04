@@ -11,12 +11,15 @@
   const TOAST_ID = "pmr-reader-toast";
   const STORAGE_KEY = "pmr.settings.v1";
   const DEFAULT_READER_MODE = "book";
+  const DEFAULT_NIGHT_MODE = 0;
+  const NIGHT_MODE_LEVELS = 3;
   const MODES = ["single", "double", "book"];
   const MODE_LABELS = {
     single: "Single",
     double: "Double",
     book: "Book"
   };
+  const NIGHT_MODE_LABELS = ["Night Off", "Night 1", "Night 2", "Night 3"];
   const IMAGE_ATTRS = [
     "currentSrc",
     "src",
@@ -72,7 +75,8 @@
 
   let settings = {
     mode: DEFAULT_READER_MODE,
-    snap: true
+    snap: true,
+    night: DEFAULT_NIGHT_MODE
   };
   let settingsLoaded = false;
   let active = false;
@@ -120,7 +124,8 @@
       if (next && typeof next === "object") {
         settings = {
           mode: MODES.includes(next.mode) ? next.mode : settings.mode,
-          snap: typeof next.snap === "boolean" ? next.snap : settings.snap
+          snap: typeof next.snap === "boolean" ? next.snap : settings.snap,
+          night: isValidNightMode(next.night) ? next.night : settings.night
         };
       }
     } catch (error) {
@@ -184,6 +189,7 @@
       '<button class="pmr-button" type="button" data-pmr-action="next" title="Next page/spread">›</button>',
       '<button class="pmr-button" type="button" data-pmr-action="mode" title="Cycle single/double/book modes">Mode</button>',
       '<button class="pmr-button" type="button" data-pmr-action="snap" title="Toggle scroll snap">Snap</button>',
+      '<button class="pmr-button" type="button" data-pmr-action="night" title="Cycle night filter strength">Night</button>',
       '<button class="pmr-button" type="button" data-pmr-action="help" title="Keyboard shortcuts">?</button>',
       '<button class="pmr-button pmr-button-primary" type="button" data-pmr-action="close" title="Turn reader off">Off</button>'
     ].join("");
@@ -243,6 +249,7 @@
     if (action === "next") goToSpread(currentSpreadIndex + 1);
     if (action === "mode") cycleMode();
     if (action === "snap") toggleSnap();
+    if (action === "night") cycleNightMode();
     if (action === "help") toggleHelp();
     if (action === "close") deactivateReader();
   }
@@ -281,6 +288,12 @@
     if (key === "s" || key === "S") {
       event.preventDefault();
       toggleSnap();
+      return;
+    }
+
+    if (key === "n" || key === "N") {
+      event.preventDefault();
+      cycleNightMode();
       return;
     }
 
@@ -331,6 +344,18 @@
     updateRootClasses();
     updateToolbar();
     showToast(`Scroll snap ${settings.snap ? "on" : "off"}.`);
+  }
+
+  function cycleNightMode() {
+    settings.night = (settings.night + 1) % (NIGHT_MODE_LEVELS + 1);
+    saveSettings();
+    updateRootClasses();
+    updateToolbar();
+    showToast(NIGHT_MODE_LABELS[settings.night]);
+  }
+
+  function isValidNightMode(value) {
+    return Number.isInteger(value) && value >= 0 && value <= NIGHT_MODE_LEVELS;
   }
 
   function toggleHelp(force) {
@@ -563,10 +588,13 @@
     if (!readerRoot) {
       return;
     }
-    readerRoot.classList.remove("pmr-mode-single", "pmr-mode-double", "pmr-mode-book", "pmr-snap-off");
+    readerRoot.classList.remove("pmr-mode-single", "pmr-mode-double", "pmr-mode-book", "pmr-snap-off", "pmr-night-1", "pmr-night-2", "pmr-night-3");
     readerRoot.classList.add(`pmr-mode-${settings.mode}`);
     if (!settings.snap) {
       readerRoot.classList.add("pmr-snap-off");
+    }
+    if (settings.night > 0) {
+      readerRoot.classList.add(`pmr-night-${settings.night}`);
     }
   }
 
@@ -584,9 +612,11 @@
     const indicator = readerRoot.querySelector("[data-pmr-indicator]");
     const modeButton = readerRoot.querySelector("[data-pmr-action='mode']");
     const snapButton = readerRoot.querySelector("[data-pmr-action='snap']");
+    const nightButton = readerRoot.querySelector("[data-pmr-action='night']");
     if (indicator) indicator.textContent = `${label} / ${pages.length}`;
     if (modeButton) modeButton.textContent = MODE_LABELS[settings.mode];
     if (snapButton) snapButton.textContent = `Snap ${settings.snap ? "On" : "Off"}`;
+    if (nightButton) nightButton.textContent = NIGHT_MODE_LABELS[settings.night];
   }
 
   function detectChapterNav() {
@@ -1480,6 +1510,7 @@
           <li><kbd>Home</kbd> / <kbd>End</kbd>: chapter start/end</li>
           <li><kbd>D</kbd>: cycle Single → Double → Book spread mode</li>
           <li><kbd>S</kbd>: toggle scroll snapping</li>
+          <li><kbd>N</kbd>: cycle Night Off → Night 1 → Night 2 → Night 3</li>
           <li><kbd>?</kbd>: show/hide this help</li>
           <li><kbd>Esc</kbd>: close help, then turn reader off</li>
         </ul>
@@ -1492,6 +1523,8 @@
   if (window.__PMR_ENABLE_TEST_API__) {
     window.__PMR_TEST_API__ = {
       DEFAULT_READER_MODE,
+      DEFAULT_NIGHT_MODE,
+      NIGHT_MODE_LEVELS,
       buildSpreads,
       chapterInfoFromText,
       chapterInfoFromUrl,

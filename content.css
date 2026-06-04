@@ -125,8 +125,21 @@ html.pmr-reader-active body > * {
   border-radius: 2px !important;
   background: #111 !important;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42) !important;
+  transition: filter 140ms ease !important;
   user-select: none !important;
   -webkit-user-drag: none !important;
+}
+
+#pmr-reader-root.pmr-night-1 .pmr-page img {
+  filter: sepia(0.18) saturate(0.96) brightness(0.92) contrast(1.05) !important;
+}
+
+#pmr-reader-root.pmr-night-2 .pmr-page img {
+  filter: sepia(0.32) saturate(0.93) brightness(0.84) contrast(1.08) !important;
+}
+
+#pmr-reader-root.pmr-night-3 .pmr-page img {
+  filter: sepia(0.48) saturate(0.9) brightness(0.74) contrast(1.12) !important;
 }
 
 #pmr-reader-root.pmr-mode-double .pmr-spread:not(.pmr-singleton) .pmr-page img,

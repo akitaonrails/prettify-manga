@@ -52,6 +52,12 @@ test("default startup mode is book", () => {
   assert.equal(api.DEFAULT_READER_MODE, "book");
 });
 
+test("night mode has off plus three filter levels", () => {
+  const api = loadApi();
+  assert.equal(api.DEFAULT_NIGHT_MODE, 0);
+  assert.equal(api.NIGHT_MODE_LEVELS, 3);
+});
+
 test("spread builder keeps horizontal scans singleton in double mode", () => {
   const api = loadApi();
   api.setChapterNavForTest(null);

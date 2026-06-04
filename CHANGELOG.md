@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added a 4-state night filter: off plus three warmer/dimmer levels for less harsh white pages.
+- Added `N` keyboard shortcut and toolbar button for cycling night filter levels.
+- Documented night filter usage in the README.
+
 ## 0.2.1
 
 - Start the reader in Book mode every time it opens.

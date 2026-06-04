@@ -29,6 +29,7 @@ The extension opens a dark overlay, fits the art to the viewport, and joins page
 - Joins paired pages in the middle for seamless two-page art spreads.
 - Keeps already-horizontal spread images as single full-width spreads.
 - Uses scroll snapping so page/spread navigation lands cleanly.
+- Adds a 3-level night filter to soften harsh white manga pages without flattening contrast.
 - Adds keyboard shortcuts and small mouse controls.
 - Adds an end-of-chapter card with detected previous/next chapter links when confidence is high.
 
@@ -68,6 +69,7 @@ You can also load this repository directory directly while developing.
 | `End` | End of chapter / chapter nav card |
 | `D` | Cycle `Single → Double → Book` |
 | `S` | Toggle scroll snap |
+| `N` | Cycle `Night Off → Night 1 → Night 2 → Night 3` |
 | `?` | Help |
 | `Esc` | Close help or turn reader off |
 
@@ -80,6 +82,10 @@ You can also load this repository directory directly while developing.
 Horizontal images, such as scans that already contain a two-page spread, stay as one full-width spread in Double and Book modes.
 
 While the reader is active, the original page is not deleted. It is hidden and suspended from normal painting behind the overlay, which is safer for toggling off and avoids breaking site scripts while reducing unnecessary background rendering.
+
+## Night filter
+
+Press `N` or click the **Night** toolbar button to cycle through three warmer, dimmer image filters. The filters use sepia, brightness, and contrast adjustments to make white pages less harsh without turning manga art into a flat gray wash.
 
 ## Generic detection approach
 
