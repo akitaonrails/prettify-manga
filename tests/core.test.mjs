@@ -144,6 +144,20 @@ test("chapter URL parsing rejects ordinary page pagination", () => {
   assert.equal(info.explicit, true);
 });
 
+test("chapter URL parsing treats hyphenated subchapters as decimals", () => {
+  const api = loadApi();
+  const chapter71 = api.chapterInfoFromUrl("https://example.test/manga/rent-a-girlfriend-chapter-71/");
+  const chapter711 = api.chapterInfoFromUrl("https://example.test/manga/rent-a-girlfriend-chapter-71-1/");
+  const chapter715 = api.chapterInfoFromUrl("https://example.test/manga/rent-a-girlfriend-chapter-71-5/");
+  const chapter72 = api.chapterInfoFromUrl("https://example.test/manga/rent-a-girlfriend-chapter-72/");
+
+  assert.equal(chapter711.number, 71.1);
+  assert.equal(chapter715.number, 71.5);
+  assert.equal(chapter71.family, chapter711.family);
+  assert.equal(chapter711.family, chapter715.family);
+  assert.equal(chapter715.family, chapter72.family);
+});
+
 test("chapter nav bad-link filter rejects ads, feeds, and social links", () => {
   const api = loadApi();
   assert.equal(api.isBadChapterNavLink(new URL("https://example.test/feed/"), "Next", ""), true);

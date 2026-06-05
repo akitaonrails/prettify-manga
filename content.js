@@ -1590,25 +1590,27 @@
 
   function chapterInfoFromText(text, familySource = text) {
     const normalized = String(text || "").toLowerCase();
-    let match = normalized.match(/(?:chapter|chap|ch|episode|ep)[-_\s\/]*([0-9]+(?:\.[0-9]+)?)/i);
+    let match = normalized.match(/(?:chapter|chap|ch|episode|ep)[-_\s\/]*([0-9]+)(?:[._-]([0-9]+))?/i);
     let explicit = Boolean(match);
+    let numberText = match ? `${match[1]}${match[2] ? `.${match[2]}` : ""}` : "";
     if (!match) {
       if (/(?:^|\/)page\/\d+(?:\/|$)/i.test(normalized)) {
         return null;
       }
       match = normalized.match(/(?:^|[-_\/\s])([0-9]{1,5})(?:\/?$|[-_\/\s])/i);
+      numberText = match ? match[1] : "";
     }
     if (!match) {
       return null;
     }
 
-    const number = Number(match[1]);
+    const number = Number(numberText);
     if (!Number.isFinite(number)) {
       return null;
     }
     const family = String(familySource || text)
       .toLowerCase()
-      .replace(/(?:chapter|chap|ch|episode|ep)[-_\s\/]*[0-9]+(?:\.[0-9]+)?/i, "chapter-#")
+      .replace(/(?:chapter|chap|ch|episode|ep)[-_\s\/]*[0-9]+(?:[._-][0-9]+)?/i, "chapter-#")
       .replace(/([\/_-])[0-9]{1,5}(?=\/?$|[\/_-])/i, "$1#")
       .replace(/\/+$/, "");
     return { number, family, explicit };

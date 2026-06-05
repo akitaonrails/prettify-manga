@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- Fixed chapter navigation scoring for hyphenated subchapters like `chapter-71-5`, treating them as `71.5` instead of `71`.
+- Added regression coverage for decimal/subchapter URL parsing.
+
 ## 0.2.3
 
 - Fixed paired spread rendering so manga pages display right-to-left while preserving chronological navigation order.
