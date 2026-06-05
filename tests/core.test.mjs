@@ -107,6 +107,13 @@ test("book mode does not pair portrait pages with landscape pages", () => {
   assert.deepEqual(plain(api.buildSpreads("book", pages).map((spread) => spread.pageIndexes)), [[0], [1], [2], [3, 4]]);
 });
 
+test("paired manga spreads render right-to-left visually", () => {
+  const api = loadApi();
+  api.setChapterNavForTest(null);
+  const spreads = api.buildSpreads("book", [{}, {}, {}]);
+  assert.deepEqual(plain(spreads.map((spread) => api.visualPageIndexesForSpread(spread))), [[0], [2, 1]]);
+});
+
 test("chapter nav spread is appended in single mode", () => {
   const api = loadApi();
   api.setChapterNavForTest({ next: { url: "https://example.test/manga/series-chapter-11/" } });

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- Fixed paired spread rendering so manga pages display right-to-left while preserving chronological navigation order.
+
 ## 0.2.2
 
 - Added a 4-state night filter: off plus three warmer/dimmer levels for less harsh white pages.

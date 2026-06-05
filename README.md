@@ -79,8 +79,8 @@ You can also load this repository directory directly while developing.
 ## Reader modes
 
 - **Single**: one fitted page per screen.
-- **Double**: pairs portrait pages side-by-side from the start.
-- **Book**: keeps the first page alone, then pairs the rest. This is the mode used each time the reader opens.
+- **Double**: pairs portrait pages side-by-side from the start, displayed right-to-left for manga.
+- **Book**: keeps the first page alone, then pairs the rest right-to-left. This is the mode used each time the reader opens.
 
 Horizontal images, such as scans that already contain a two-page spread, stay as one full-width spread in Double and Book modes.
 

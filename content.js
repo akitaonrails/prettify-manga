@@ -1154,7 +1154,7 @@
       section.dataset.pageStart = String(spread.pageIndexes[0] + 1);
       section.setAttribute("aria-label", spreadLabel(spread));
 
-      spread.pageIndexes.forEach((pageIndex) => {
+      visualPageIndexesForSpread(spread).forEach((pageIndex) => {
         const page = pages[pageIndex];
         const figure = document.createElement("figure");
         figure.className = "pmr-page";
@@ -1212,6 +1212,13 @@
 
     appendChapterNavSpread(result);
     return result;
+  }
+
+  function visualPageIndexesForSpread(spread) {
+    if (!spread || spread.type === "chapter-nav" || spread.pageIndexes.length <= 1) {
+      return spread?.pageIndexes || [];
+    }
+    return [...spread.pageIndexes].reverse();
   }
 
   function appendChapterNavSpread(spreadList) {
@@ -2297,6 +2304,7 @@
       chapterInfoFromUrl,
       isKindleMangaReaderPage,
       kindleNavigationPlanFromKey,
+      visualPageIndexesForSpread,
       isBadChapterNavLink,
       isLandscapePage,
       logicalImageKey,
