@@ -58,6 +58,29 @@ test("night mode has off plus three filter levels", () => {
   assert.equal(api.NIGHT_MODE_LEVELS, 3);
 });
 
+test("kindle manga handler is gated to country reader manga paths", () => {
+  const api = loadApi();
+  assert.equal(api.isKindleMangaReaderPage({ hostname: "read.amazon.com", pathname: "/manga/B08FBPPCHM" }), true);
+  assert.equal(api.isKindleMangaReaderPage({ hostname: "read.amazon.co.jp", pathname: "/manga/B08FBPPCHM" }), true);
+  assert.equal(api.isKindleMangaReaderPage({ hostname: "read.amazon.co.uk", pathname: "/manga/B08FBPPCHM" }), true);
+  assert.equal(api.isKindleMangaReaderPage({ hostname: "read.amazon.com.br", pathname: "/manga/B08FBPPCHM" }), true);
+  assert.equal(api.isKindleMangaReaderPage({ hostname: "read.kindle.com", pathname: "/manga/B08FBPPCHM" }), true);
+  assert.equal(api.isKindleMangaReaderPage({ hostname: "read.amazon.com", pathname: "/kindle-library" }), false);
+  assert.equal(api.isKindleMangaReaderPage({ hostname: "read.amazon.com.evil.test", pathname: "/manga/B08FBPPCHM" }), false);
+  assert.equal(api.isKindleMangaReaderPage({ hostname: "www.amazon.com", pathname: "/manga/B08FBPPCHM" }), false);
+});
+
+test("kindle key bindings map to page navigation intents", () => {
+  const api = loadApi();
+  assert.deepEqual(plain(api.kindleNavigationPlanFromKey("PageDown")), { action: "next", nativeKey: "PageDown", wheelDirection: 1 });
+  assert.deepEqual(plain(api.kindleNavigationPlanFromKey("ArrowRight")), { action: "next", nativeKey: "ArrowRight", turnerSide: "right" });
+  assert.deepEqual(plain(api.kindleNavigationPlanFromKey("PageUp")), { action: "prev", nativeKey: "PageUp", wheelDirection: -1 });
+  assert.deepEqual(plain(api.kindleNavigationPlanFromKey("ArrowLeft")), { action: "prev", nativeKey: "ArrowLeft", turnerSide: "left" });
+  assert.deepEqual(plain(api.kindleNavigationPlanFromKey(" ", true)), { action: "prev", nativeKey: " ", shiftKey: true, wheelDirection: -1 });
+  assert.deepEqual(plain(api.kindleNavigationPlanFromKey("Home")), { action: "start", nativeKey: "Home" });
+  assert.deepEqual(plain(api.kindleNavigationPlanFromKey("End")), { action: "end", nativeKey: "End" });
+});
+
 test("spread builder keeps horizontal scans singleton in double mode", () => {
   const api = loadApi();
   api.setChapterNavForTest(null);

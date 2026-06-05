@@ -8,11 +8,25 @@
 
   const ROOT_ID = "pmr-reader-root";
   const ACTIVATOR_ID = "pmr-reader-activator";
+  const KINDLE_TOOLBAR_ID = "pmr-kindle-toolbar";
   const TOAST_ID = "pmr-reader-toast";
   const STORAGE_KEY = "pmr.settings.v1";
   const DEFAULT_READER_MODE = "book";
   const DEFAULT_NIGHT_MODE = 0;
   const NIGHT_MODE_LEVELS = 3;
+  const KINDLE_READER_HOST_RE = /^read\.(?:amazon|kindle)\.(?:com|co\.jp|co\.uk|de|fr|it|es|nl|se|pl|ca|com\.br|com\.mx|com\.au|in|sg|ae|sa|eg|com\.tr|com\.be)$/i;
+  const KINDLE_MANGA_PATH_RE = /^\/manga(?:\/|$)/i;
+  const KINDLE_FRAME_MESSAGE_TYPE = "PMR_KINDLE_FRAME_COMMAND";
+  const KINDLE_SURFACE_REFRESH_DELAY_MS = 140;
+  const KINDLE_PAGE_CONTAINER_SELECTOR = [
+    "#sitbreaderpagecontainer",
+    "[id*='readerpagecontainer' i]",
+    "[id*='pagecontainer' i][id*='reader' i]",
+    "[class*='readerpagecontainer' i]",
+    "[class*='pagecontainer' i][class*='reader' i]",
+    "[data-testid*='reader' i][data-testid*='page' i]"
+  ].join(", ");
+  const KINDLE_PAGE_SURFACE_SELECTOR = "img, canvas, svg, [role='img'], [style*='background-image']";
   const MODES = ["single", "double", "book"];
   const MODE_LABELS = {
     single: "Single",
@@ -90,11 +104,33 @@
   let activatorRefreshTimer = 0;
   let scrollRaf = 0;
   let layoutRefreshTimer = 0;
+  let kindleHandlerActive = false;
+  let kindleToolbar = null;
+  let kindleMutationObserver = null;
+  let kindleSurfaceRefreshTimer = 0;
+  let kindleForwardingKey = false;
+  let kindleActionToggleSeen = false;
+  const isTopWindow = !window.top || window.top === window;
+  const scriptStartedAt = Date.now();
 
-  loadSettings();
-  scheduleActivatorRefresh(ACTIVATOR_INITIAL_DELAY_MS);
-  observeEarlyMutations();
-  window.addEventListener("pageshow", () => scheduleActivatorRefresh(ACTIVATOR_PAGESHOW_DELAY_MS), { passive: true });
+  const kindleMangaPage = isKindleMangaContext();
+  if (kindleMangaPage) {
+    setupKindleMangaHandler();
+  }
+
+  loadSettings().then(() => {
+    if (kindleMangaPage) {
+      setupKindleMangaHandler();
+    }
+  });
+
+  if (kindleMangaPage) {
+    window.addEventListener("pageshow", () => setupKindleMangaHandler(), { passive: true });
+  } else if (isTopWindow) {
+    scheduleActivatorRefresh(ACTIVATOR_INITIAL_DELAY_MS);
+    observeEarlyMutations();
+    window.addEventListener("pageshow", () => scheduleActivatorRefresh(ACTIVATOR_PAGESHOW_DELAY_MS), { passive: true });
+  }
 
   if (chrome?.runtime?.onMessage) {
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -102,7 +138,12 @@
         return false;
       }
 
-      Promise.resolve(toggleReader())
+      const toggle = isKindleMangaContext() ? toggleKindleMangaHandler : isTopWindow ? toggleReader : null;
+      if (!toggle) {
+        sendResponse({ active: false, ignoredFrame: true });
+        return false;
+      }
+      Promise.resolve(toggle())
         .then(sendResponse)
         .catch((error) => {
           console.warn("Prettify Manga Reader toggle failed", error);
@@ -143,6 +184,732 @@
     chrome.storage.local.set({ [STORAGE_KEY]: settings }).catch((error) => {
       console.warn("Prettify Manga Reader could not save settings", error);
     });
+  }
+
+  function isKindleMangaReaderPage(source = location) {
+    const host = String(source?.hostname || source?.host || "").toLowerCase();
+    const pathname = String(source?.pathname || "");
+    return KINDLE_READER_HOST_RE.test(host) && KINDLE_MANGA_PATH_RE.test(pathname);
+  }
+
+  function isKindleMangaContext() {
+    if (isKindleMangaReaderPage(location)) {
+      return true;
+    }
+
+    if (isTopWindow) {
+      return false;
+    }
+
+    try {
+      if (isKindleMangaReaderPage(window.top.location)) {
+        return true;
+      }
+    } catch (_error) {
+      // Cross-origin frames cannot inspect top.location. Fall back to referrer.
+    }
+
+    const referrerUrl = safeUrl(document.referrer, location.href);
+    return Boolean(referrerUrl && isKindleMangaReaderPage(referrerUrl));
+  }
+
+  async function toggleKindleMangaHandler() {
+    await loadSettings();
+    if (kindleHandlerActive) {
+      if (!kindleActionToggleSeen && Date.now() - scriptStartedAt < 2_000) {
+        kindleActionToggleSeen = true;
+        setupKindleMangaHandler();
+        return { active: true, kindle: true, night: settings.night };
+      }
+      kindleActionToggleSeen = true;
+      teardownKindleMangaHandler();
+      return { active: false, kindle: true, night: settings.night };
+    }
+    kindleActionToggleSeen = true;
+    setupKindleMangaHandler();
+    return { active: kindleHandlerActive, kindle: true, night: settings.night };
+  }
+
+  function setupKindleMangaHandler() {
+    if (!isKindleMangaContext() || !document.documentElement) {
+      return;
+    }
+
+    kindleHandlerActive = true;
+    removeActivator();
+    if (isTopWindow) {
+      ensureKindleToolbar();
+    }
+    updateKindleNightUi();
+    scheduleKindleSurfaceRefresh(0);
+
+    document.addEventListener("keydown", handleKindleKeyDown, true);
+    window.addEventListener("keydown", handleKindleKeyDown, true);
+    window.addEventListener("message", handleKindleFrameMessage);
+    window.addEventListener("resize", scheduleKindleSurfaceRefresh, { passive: true });
+
+    if (!document.body) {
+      window.setTimeout(() => {
+        if (kindleHandlerActive) {
+          setupKindleMangaHandler();
+        }
+      }, 120);
+    } else if (!kindleMutationObserver) {
+      kindleMutationObserver = new MutationObserver(() => scheduleKindleSurfaceRefresh());
+      kindleMutationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["src", "srcset", "style"]
+      });
+    }
+  }
+
+  function teardownKindleMangaHandler() {
+    kindleHandlerActive = false;
+    window.clearTimeout(kindleSurfaceRefreshTimer);
+    document.removeEventListener("keydown", handleKindleKeyDown, true);
+    window.removeEventListener("keydown", handleKindleKeyDown, true);
+    window.removeEventListener("message", handleKindleFrameMessage);
+    window.removeEventListener("resize", scheduleKindleSurfaceRefresh);
+    if (kindleMutationObserver) {
+      kindleMutationObserver.disconnect();
+      kindleMutationObserver = null;
+    }
+    removeKindleToolbar();
+    document.documentElement?.classList.remove("pmr-kindle-handler-active", "pmr-kindle-night-1", "pmr-kindle-night-2", "pmr-kindle-night-3");
+    document.querySelectorAll?.(".pmr-kindle-page-surface").forEach((element) => element.classList.remove("pmr-kindle-page-surface"));
+  }
+
+  function ensureKindleToolbar() {
+    kindleToolbar = document.getElementById(KINDLE_TOOLBAR_ID);
+    if (kindleToolbar) {
+      return kindleToolbar;
+    }
+
+    kindleToolbar = document.createElement("div");
+    kindleToolbar.id = KINDLE_TOOLBAR_ID;
+    kindleToolbar.setAttribute("role", "toolbar");
+    kindleToolbar.setAttribute("aria-label", "Kindle manga controls");
+    kindleToolbar.innerHTML = [
+      '<button class="pmr-button" type="button" data-pmr-kindle-action="prev" title="Previous page">‹</button>',
+      '<button class="pmr-button" type="button" data-pmr-kindle-action="next" title="Next page">›</button>',
+      '<button class="pmr-button" type="button" data-pmr-kindle-action="night" title="Cycle night filter strength">Night</button>'
+    ].join("");
+    kindleToolbar.addEventListener("click", handleKindleToolbarClick);
+    document.documentElement.appendChild(kindleToolbar);
+    return kindleToolbar;
+  }
+
+  function removeKindleToolbar() {
+    const existing = document.getElementById(KINDLE_TOOLBAR_ID);
+    if (existing) {
+      existing.remove();
+    }
+    kindleToolbar = null;
+  }
+
+  function handleKindleToolbarClick(event) {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+    const button = event.target.closest("[data-pmr-kindle-action]");
+    if (!button) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const action = button.getAttribute("data-pmr-kindle-action");
+    if (action === "night") cycleKindleNightMode();
+    if (action === "prev") navigateKindleByPlan({ action: "prev", nativeKey: "ArrowLeft", turnerSide: "left" });
+    if (action === "next") navigateKindleByPlan({ action: "next", nativeKey: "ArrowRight", turnerSide: "right" });
+  }
+
+  function handleKindleKeyDown(event) {
+    if (!isKindleMangaContext()) {
+      teardownKindleMangaHandler();
+      return;
+    }
+
+    if (!kindleHandlerActive || kindleForwardingKey || isKindleTextEntryTarget(event.target)) {
+      return;
+    }
+
+    if (event.ctrlKey || event.altKey || event.metaKey) {
+      return;
+    }
+
+    const key = event.key;
+    if (key === "n" || key === "N") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cycleKindleNightMode();
+      return;
+    }
+
+    const plan = kindleNavigationPlanFromKey(key, event.shiftKey);
+    if (!plan) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    navigateKindleByPlan(plan);
+  }
+
+  function handleKindleFrameMessage(event) {
+    const data = event.data;
+    if (!data || data.type !== KINDLE_FRAME_MESSAGE_TYPE || !isKindleMangaContext()) {
+      return;
+    }
+    if (isTopWindow || (event.source !== window.parent && event.source !== window.top)) {
+      return;
+    }
+    if (data.command === "night") {
+      settings.night = isValidNightMode(data.night) ? data.night : settings.night;
+      updateKindleNightUi();
+      scheduleKindleSurfaceRefresh(0);
+      return;
+    }
+
+    if (data.command === "navigate" && isValidKindleNavigationPlan(data.plan)) {
+      navigateKindleByPlan(data.plan, { broadcast: false });
+    }
+  }
+
+  function kindleNavigationPlanFromKey(key, shiftKey = false) {
+    const normalized = key === "Spacebar" ? " " : key;
+    if (normalized === "Home") return { action: "start", nativeKey: "Home" };
+    if (normalized === "End") return { action: "end", nativeKey: "End" };
+    if (normalized === "PageDown") return { action: "next", nativeKey: "PageDown", wheelDirection: 1 };
+    if (normalized === "PageUp") return { action: "prev", nativeKey: "PageUp", wheelDirection: -1 };
+    if (normalized === "ArrowRight") return { action: "next", nativeKey: "ArrowRight", turnerSide: "right" };
+    if (normalized === "ArrowDown") return { action: "next", nativeKey: "ArrowDown", wheelDirection: 1 };
+    if (normalized === "ArrowLeft") return { action: "prev", nativeKey: "ArrowLeft", turnerSide: "left" };
+    if (normalized === "ArrowUp") return { action: "prev", nativeKey: "ArrowUp", wheelDirection: -1 };
+    if (normalized === " ") return shiftKey ? { action: "prev", nativeKey: " ", shiftKey: true, wheelDirection: -1 } : { action: "next", nativeKey: " ", wheelDirection: 1 };
+    return null;
+  }
+
+  function isKindleTextEntryTarget(target) {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+    if (target.isContentEditable || target.closest("[contenteditable='true'], [role='textbox']")) {
+      return true;
+    }
+    const tag = target.tagName.toLowerCase();
+    if (tag === "textarea" || tag === "select") {
+      return true;
+    }
+    if (tag !== "input") {
+      return false;
+    }
+    const type = String(target.getAttribute("type") || "text").toLowerCase();
+    return ["", "text", "search", "email", "password", "tel", "url", "number"].includes(type);
+  }
+
+  function navigateKindleByPlan(plan, options = {}) {
+    if (!isValidKindleNavigationPlan(plan)) {
+      return false;
+    }
+
+    const shouldBroadcast = options.broadcast !== false && isTopWindow;
+    if (shouldBroadcast) {
+      broadcastKindleFrameCommand({ command: "navigate", plan });
+    }
+
+    if (plan.action === "next" || plan.action === "prev") {
+      if (plan.wheelDirection) {
+        dispatchKindleWheel(plan);
+      }
+      if (plan.turnerSide) {
+        clickKindlePageTurner(plan) || clickKindlePageRegion(plan);
+      }
+    }
+
+    const dispatched = dispatchKindleNavigationKey(plan);
+    window.setTimeout(() => scrollKindleFallback(plan), 80);
+    return dispatched;
+  }
+
+  function broadcastKindleFrameCommand(command) {
+    let delivered = 0;
+    Array.from(document.querySelectorAll("iframe")).forEach((frame) => {
+      try {
+        if (!frame.contentWindow) {
+          return;
+        }
+        frame.contentWindow.postMessage({ type: KINDLE_FRAME_MESSAGE_TYPE, ...command }, "*");
+        delivered += 1;
+      } catch (_error) {
+        // Cross-origin or sandboxed frames can reject access; ignore them.
+      }
+    });
+    return delivered;
+  }
+
+  function isValidKindleNavigationPlan(plan) {
+    if (!plan || typeof plan !== "object") {
+      return false;
+    }
+    if (!["next", "prev", "start", "end"].includes(plan.action)) {
+      return false;
+    }
+    if (plan.nativeKey !== undefined && typeof plan.nativeKey !== "string") {
+      return false;
+    }
+    if (plan.turnerSide !== undefined && !["left", "right"].includes(plan.turnerSide)) {
+      return false;
+    }
+    if (plan.wheelDirection !== undefined && plan.wheelDirection !== 1 && plan.wheelDirection !== -1) {
+      return false;
+    }
+    if (plan.shiftKey !== undefined && typeof plan.shiftKey !== "boolean") {
+      return false;
+    }
+    return true;
+  }
+
+  function clickKindlePageTurner(plan) {
+    const selectors = kindleTurnerSelectors(plan);
+    for (const selector of selectors) {
+      const elements = Array.from(document.querySelectorAll(selector));
+      for (const element of elements) {
+        const target = closestKindleClickable(element);
+        if (!isSafeKindleControl(target) || !isLikelyKindlePageTurner(target, plan) || !isVisibleElement(target)) {
+          continue;
+        }
+        clickKindleElement(target);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function clickKindlePageRegion(plan) {
+    const point = kindlePageRegionPoint(plan);
+    const target = document.elementFromPoint?.(point.x, point.y);
+    if (!(target instanceof Element) || target.closest(`#${KINDLE_TOOLBAR_ID}, #${ROOT_ID}, #${ACTIVATOR_ID}`)) {
+      return false;
+    }
+    dispatchKindlePointerClick(target, point);
+    return true;
+  }
+
+  function dispatchKindleWheel(plan) {
+    const point = kindlePageRegionPoint({ action: plan.action });
+    const target = document.elementFromPoint?.(point.x, point.y) || document.body || document.documentElement;
+    if (!target || typeof target.dispatchEvent !== "function") {
+      return false;
+    }
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 900;
+    target.dispatchEvent(new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: point.x,
+      clientY: point.y,
+      deltaX: 0,
+      deltaY: (plan.wheelDirection || 1) * Math.max(520, viewportHeight * 0.72),
+      deltaMode: 0
+    }));
+    return true;
+  }
+
+  function kindlePageRegionPoint(plan) {
+    const width = window.innerWidth || document.documentElement.clientWidth || 900;
+    const height = window.innerHeight || document.documentElement.clientHeight || 900;
+    const edgeOffset = Math.max(28, Math.min(96, width * 0.08));
+    const x = plan.turnerSide === "left"
+      ? edgeOffset
+      : plan.turnerSide === "right"
+        ? width - edgeOffset
+        : Math.max(edgeOffset, Math.min(width - edgeOffset, width / 2));
+    return { x, y: Math.max(40, Math.min(height - 40, height / 2)) };
+  }
+
+  function dispatchKindlePointerClick(target, point) {
+    const pointerOptions = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: point.x,
+      clientY: point.y,
+      screenX: window.screenX + point.x,
+      screenY: window.screenY + point.y,
+      button: 0,
+      buttons: 1,
+      pointerId: 1,
+      pointerType: "mouse",
+      isPrimary: true
+    };
+    const mouseOptions = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      view: window,
+      clientX: point.x,
+      clientY: point.y,
+      screenX: window.screenX + point.x,
+      screenY: window.screenY + point.y,
+      button: 0,
+      buttons: 1
+    };
+
+    if (typeof PointerEvent === "function") {
+      target.dispatchEvent(new PointerEvent("pointerover", pointerOptions));
+      target.dispatchEvent(new PointerEvent("pointermove", pointerOptions));
+      target.dispatchEvent(new PointerEvent("pointerdown", pointerOptions));
+    }
+    target.dispatchEvent(new MouseEvent("mouseover", mouseOptions));
+    target.dispatchEvent(new MouseEvent("mousemove", mouseOptions));
+    target.dispatchEvent(new MouseEvent("mousedown", mouseOptions));
+    target.dispatchEvent(new MouseEvent("mouseup", { ...mouseOptions, buttons: 0 }));
+    if (typeof PointerEvent === "function") {
+      target.dispatchEvent(new PointerEvent("pointerup", { ...pointerOptions, buttons: 0 }));
+    }
+    target.dispatchEvent(new MouseEvent("click", { ...mouseOptions, buttons: 0 }));
+  }
+
+  function kindleTurnerSelectors(plan) {
+    const nextLabelSelectors = [
+      "button[aria-label*='next' i]",
+      "button[title*='next' i]",
+      "button[data-testid*='next' i]",
+      "[role='button'][aria-label*='next' i]",
+      "[role='button'][title*='next' i]",
+      "[onclick][aria-label*='next' i]",
+      "button[aria-label*='次']",
+      "button[title*='次']",
+      "[role='button'][aria-label*='次']",
+      "[onclick][aria-label*='次']"
+    ];
+    const prevLabelSelectors = [
+      "button[aria-label*='previous' i]",
+      "button[aria-label*='prev' i]",
+      "button[title*='previous' i]",
+      "button[title*='prev' i]",
+      "button[data-testid*='previous' i]",
+      "button[data-testid*='prev' i]",
+      "[role='button'][aria-label*='previous' i]",
+      "[role='button'][aria-label*='prev' i]",
+      "[role='button'][title*='previous' i]",
+      "[role='button'][title*='prev' i]",
+      "[onclick][aria-label*='previous' i]",
+      "[onclick][aria-label*='prev' i]",
+      "button[aria-label*='前']",
+      "button[title*='前']",
+      "[role='button'][aria-label*='前']",
+      "[onclick][aria-label*='前']"
+    ];
+    const rightSelectors = ["#sitbreaderrightpageturner", "[id*='rightpageturner' i]"];
+    const leftSelectors = ["#sitbreaderleftpageturner", "[id*='leftpageturner' i]"];
+
+    const sideSelectors = plan.turnerSide === "right" ? rightSelectors : plan.turnerSide === "left" ? leftSelectors : [];
+    const actionSelectors = plan.action === "next" ? nextLabelSelectors : prevLabelSelectors;
+    return [...sideSelectors, ...actionSelectors];
+  }
+
+  function closestKindleClickable(element) {
+    if (!element?.closest) {
+      return element;
+    }
+    return element.closest("button, [role='button'], a[href], [onclick], [tabindex]") || element;
+  }
+
+  function isSafeKindleControl(element) {
+    if (!(element instanceof Element)) {
+      return false;
+    }
+    if (element.closest(`#${KINDLE_TOOLBAR_ID}, #${ROOT_ID}, #${ACTIVATOR_ID}`)) {
+      return false;
+    }
+    const href = element.getAttribute("href");
+    if (!href) {
+      return true;
+    }
+    const url = safeUrl(href, location.href);
+    return !url || url.origin === location.origin;
+  }
+
+  function isLikelyKindlePageTurner(element, plan) {
+    const signature = kindleElementSignature(element);
+    if (/sitbreader(?:right|left)pageturner|page[-_\s]?turn|pageturner/.test(signature)) {
+      return true;
+    }
+    if (/(?:next|prev|previous)\s+page|page\s+(?:next|prev|previous)|次.*ページ|前.*ページ/.test(signature)) {
+      return true;
+    }
+    if (/reader|kindle|manga/.test(signature) && /next|prev|previous|left|right|次|前/.test(signature)) {
+      return true;
+    }
+
+    const rect = element.getBoundingClientRect?.();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    if (!rect || viewportWidth <= 0) {
+      return false;
+    }
+    if (plan.turnerSide === "right") {
+      return rect.left >= viewportWidth * 0.55;
+    }
+    if (plan.turnerSide === "left") {
+      return rect.right <= viewportWidth * 0.45;
+    }
+    return false;
+  }
+
+  function kindleElementSignature(element) {
+    return [
+      element.id,
+      element.className,
+      element.getAttribute?.("aria-label"),
+      element.getAttribute?.("title"),
+      element.getAttribute?.("data-testid")
+    ].join(" ").toLowerCase();
+  }
+
+  function clickKindleElement(element) {
+    if (typeof element.click === "function") {
+      element.click();
+      return;
+    }
+    element.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, composed: true }));
+  }
+
+  function dispatchKindleNavigationKey(plan) {
+    const key = plan.nativeKey || (plan.action === "next" ? "ArrowRight" : plan.action === "prev" ? "ArrowLeft" : plan.action === "start" ? "Home" : "End");
+    const keyInfo = kindleKeyInfo(key);
+    const targets = uniqueTargets([
+      isSafeKindleEventTarget(document.activeElement) ? document.activeElement : null,
+      document.body,
+      document.documentElement,
+      document,
+      window
+    ]);
+
+    kindleForwardingKey = true;
+    try {
+      for (const type of ["keydown", "keyup"]) {
+        for (const target of targets) {
+          target.dispatchEvent(new KeyboardEvent(type, {
+            key,
+            code: keyInfo.code,
+            keyCode: keyInfo.keyCode,
+            which: keyInfo.keyCode,
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            shiftKey: Boolean(plan.shiftKey)
+          }));
+        }
+      }
+      return targets.length > 0;
+    } finally {
+      kindleForwardingKey = false;
+    }
+  }
+
+  function isSafeKindleEventTarget(target) {
+    return target && target !== document.body && target !== document.documentElement && !target.closest?.(`#${KINDLE_TOOLBAR_ID}`);
+  }
+
+  function kindleKeyInfo(key) {
+    const keyMap = {
+      " ": { code: "Space", keyCode: 32 },
+      ArrowLeft: { code: "ArrowLeft", keyCode: 37 },
+      ArrowUp: { code: "ArrowUp", keyCode: 38 },
+      ArrowRight: { code: "ArrowRight", keyCode: 39 },
+      ArrowDown: { code: "ArrowDown", keyCode: 40 },
+      PageUp: { code: "PageUp", keyCode: 33 },
+      PageDown: { code: "PageDown", keyCode: 34 },
+      End: { code: "End", keyCode: 35 },
+      Home: { code: "Home", keyCode: 36 }
+    };
+    return keyMap[key] || { code: key, keyCode: 0 };
+  }
+
+  function uniqueTargets(targets) {
+    return targets.filter((target, index) => target && targets.indexOf(target) === index && typeof target.dispatchEvent === "function");
+  }
+
+  function scrollKindleFallback(plan) {
+    const scroller = findKindleScrollSurface();
+    if (!scroller) {
+      return;
+    }
+
+    const horizontal = scroller.scrollWidth > scroller.clientWidth + 8;
+    const viewportWidth = scroller.clientWidth || window.innerWidth || document.documentElement.clientWidth || 900;
+    const viewportHeight = scroller.clientHeight || window.innerHeight || document.documentElement.clientHeight || 900;
+
+    if (plan.action === "start" || plan.action === "end") {
+      const left = plan.action === "start" ? 0 : Math.max(0, scroller.scrollWidth - viewportWidth);
+      const top = plan.action === "start" ? 0 : Math.max(0, scroller.scrollHeight - viewportHeight);
+      scroller.scrollTo?.({ left, top, behavior: "smooth" });
+      return;
+    }
+
+    const direction = plan.action === "next" ? 1 : -1;
+    scroller.scrollBy?.({
+      left: horizontal ? direction * viewportWidth * 0.9 : 0,
+      top: horizontal ? 0 : direction * viewportHeight * 0.9,
+      behavior: "smooth"
+    });
+  }
+
+  function findKindleScrollSurface() {
+    const containers = queryKindlePageContainers(document);
+    for (const container of containers) {
+      const scrollable = nearestScrollableElement(container);
+      if (scrollable) {
+        return scrollable;
+      }
+    }
+    return document.scrollingElement || document.documentElement;
+  }
+
+  function nearestScrollableElement(element) {
+    let current = element;
+    while (current && current !== document.documentElement) {
+      if (isScrollableElement(current)) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+    return isScrollableElement(document.documentElement) ? document.documentElement : null;
+  }
+
+  function isScrollableElement(element) {
+    return Boolean(element && (element.scrollHeight > element.clientHeight + 8 || element.scrollWidth > element.clientWidth + 8));
+  }
+
+  function cycleKindleNightMode() {
+    settings.night = (settings.night + 1) % (NIGHT_MODE_LEVELS + 1);
+    saveSettings();
+    updateKindleNightUi();
+    scheduleKindleSurfaceRefresh(0);
+    if (isTopWindow) {
+      broadcastKindleFrameCommand({ command: "night", night: settings.night });
+    }
+    showToast(NIGHT_MODE_LABELS[settings.night]);
+  }
+
+  function updateKindleNightUi() {
+    const root = document.documentElement;
+    if (!root) {
+      return;
+    }
+    root.classList.remove("pmr-kindle-night-1", "pmr-kindle-night-2", "pmr-kindle-night-3");
+    root.classList.toggle("pmr-kindle-handler-active", kindleHandlerActive);
+    if (settings.night > 0) {
+      root.classList.add(`pmr-kindle-night-${settings.night}`);
+    }
+    const nightButton = kindleToolbar?.querySelector("[data-pmr-kindle-action='night']");
+    if (nightButton) {
+      nightButton.textContent = NIGHT_MODE_LABELS[settings.night];
+    }
+  }
+
+  function scheduleKindleSurfaceRefresh(delay = KINDLE_SURFACE_REFRESH_DELAY_MS) {
+    const refreshDelay = Number.isFinite(delay) ? delay : KINDLE_SURFACE_REFRESH_DELAY_MS;
+    window.clearTimeout(kindleSurfaceRefreshTimer);
+    kindleSurfaceRefreshTimer = window.setTimeout(refreshKindlePageSurfaces, refreshDelay);
+  }
+
+  function refreshKindlePageSurfaces() {
+    if (!isKindleMangaContext()) {
+      teardownKindleMangaHandler();
+      return;
+    }
+
+    if (!kindleHandlerActive) {
+      return;
+    }
+
+    const nextSurfaces = collectKindlePageSurfaces(document);
+    document.querySelectorAll(".pmr-kindle-page-surface").forEach((element) => {
+      if (!nextSurfaces.has(element)) {
+        element.classList.remove("pmr-kindle-page-surface");
+      }
+    });
+    nextSurfaces.forEach((element) => element.classList.add("pmr-kindle-page-surface"));
+  }
+
+  function collectKindlePageSurfaces(root = document) {
+    const surfaces = new Set();
+    const containers = queryKindlePageContainers(root);
+
+    containers.forEach((container) => {
+      const media = Array.from(container.querySelectorAll?.(KINDLE_PAGE_SURFACE_SELECTOR) || []).filter(isKindleFilterSurface);
+      if (media.length > 0) {
+        media.forEach((element) => surfaces.add(element));
+      } else if (isKindleFilterSurface(container)) {
+        surfaces.add(container);
+      }
+    });
+
+    if (surfaces.size === 0) {
+      Array.from(root.querySelectorAll?.("canvas, img, [role='img'], [style*='background-image']") || [])
+        .filter(isLikelyLargeKindleSurface)
+        .forEach((element) => surfaces.add(element));
+    }
+
+    return surfaces;
+  }
+
+  function queryKindlePageContainers(root = document) {
+    const containers = [];
+    const byId = root.getElementById?.("sitbreaderpagecontainer");
+    if (byId) {
+      containers.push(byId);
+    }
+    Array.from(root.querySelectorAll?.(KINDLE_PAGE_CONTAINER_SELECTOR) || []).forEach((element) => {
+      if (!containers.includes(element)) {
+        containers.push(element);
+      }
+    });
+    return containers.filter((element) => element instanceof Element && !element.closest(`#${KINDLE_TOOLBAR_ID}, #${ROOT_ID}, #${ACTIVATOR_ID}`));
+  }
+
+  function isKindleFilterSurface(element) {
+    if (!(element instanceof Element) || element.closest(`#${KINDLE_TOOLBAR_ID}, #${ROOT_ID}, #${ACTIVATOR_ID}`)) {
+      return false;
+    }
+    const rect = element.getBoundingClientRect?.();
+    if (rect && (rect.width <= 2 || rect.height <= 2)) {
+      return false;
+    }
+    return true;
+  }
+
+  function isLikelyLargeKindleSurface(element) {
+    if (!isKindleFilterSurface(element)) {
+      return false;
+    }
+    const rect = element.getBoundingClientRect?.();
+    if (!rect) {
+      return false;
+    }
+    const minWidth = Math.min(360, Math.max(180, (window.innerWidth || 0) * 0.24));
+    const minHeight = Math.min(360, Math.max(180, (window.innerHeight || 0) * 0.24));
+    return rect.width >= minWidth && rect.height >= minHeight;
+  }
+
+  function isVisibleElement(element) {
+    if (!(element instanceof Element)) {
+      return false;
+    }
+    const rect = element.getBoundingClientRect?.();
+    if (rect && (rect.width <= 1 || rect.height <= 1)) {
+      return false;
+    }
+    const style = window.getComputedStyle?.(element);
+    return !style || (style.display !== "none" && style.visibility !== "hidden" && style.pointerEvents !== "none");
   }
 
   async function toggleReader() {
@@ -1528,6 +2295,8 @@
       buildSpreads,
       chapterInfoFromText,
       chapterInfoFromUrl,
+      isKindleMangaReaderPage,
+      kindleNavigationPlanFromKey,
       isBadChapterNavLink,
       isLandscapePage,
       logicalImageKey,

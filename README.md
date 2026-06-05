@@ -8,6 +8,8 @@ Did you know many manga artists compose key moments as two-page spreads? If you 
 
 Prettify Manga Reader restores more of the artist's original intent. It turns ugly, ad-bloated manga websites into a modern dark-mode reader with fitted pages, joined two-page spreads, keyboard navigation, and clean controls. It is generic by design, so it works across most manga sites instead of being hardcoded to one domain.
 
+It also includes a small Kindle Web Reader helper for manga opened on country reader domains such as `read.amazon.com`, `read.amazon.co.jp`, `read.amazon.co.uk`, and matching `read.kindle.*` hosts.
+
 ## Before: the usual fansub page
 
 Most sites bury manga pages inside a bright, cluttered layout and make you scroll one page at a time.
@@ -32,6 +34,7 @@ The extension opens a dark overlay, fits the art to the viewport, and joins page
 - Adds a 3-level night filter to soften harsh white manga pages without flattening contrast.
 - Adds keyboard shortcuts and small mouse controls.
 - Adds an end-of-chapter card with detected previous/next chapter links when confidence is high.
+- Adds Kindle Web Reader manga shortcuts and a small night-filter toolbar on Amazon/Kindle country reader domains.
 
 ## Install locally
 
@@ -87,6 +90,19 @@ While the reader is active, the original page is not deleted. It is hidden and s
 
 Press `N` or click the **Night** toolbar button to cycle through three warmer, dimmer image filters. The filters use sepia, brightness, and contrast adjustments to make white pages less harsh without turning manga art into a flat gray wash.
 
+## Kindle Web Reader manga support
+
+![Kindle Web Reader manga page with the Prettify Manga Reader night toolbar in the bottom-right corner.](assets/screenshot-kindle.webp)
+
+On manga URLs like `read.amazon.com/manga/...`, `read.amazon.co.jp/manga/...`, or other supported country reader hosts, the extension does not rebuild the book into its own overlay. Instead, it adds a small bottom-right toolbar and keyboard bindings on top of Amazon's native reader:
+
+- `Space`, `PageDown`, `Down`, `Right`: next page
+- `Shift+Space`, `PageUp`, `Up`, `Left`: previous page
+- `Home` / `End`: beginning/end of the chapter when the native reader accepts those keys, with a scroll fallback
+- `N` or the toolbar **Night** button: cycle `Night Off → Night 1 → Night 2 → Night 3`
+
+The Kindle helper is host-gated to `read.amazon.*` and `read.kindle.*` country reader domains and `/manga/...` paths. It does not store Amazon credentials or session data, and no account-specific data is needed in the source tree.
+
 ## Generic detection approach
 
 The extension is not hardcoded to the tested sites. It detects likely manga pages by combining:
@@ -115,6 +131,7 @@ Previous/next chapter detection is deliberately conservative. It prefers `rel="p
 - `content.js`: manga page detection, reader UI, spread layout, shortcuts, chapter navigation.
 - `content.css`: overlay, controls, page fitting, double-spread layout.
 - `assets/demo.mp4`: optimized showcase video.
+- `assets/screenshot-kindle.webp`: Kindle Web Reader helper screenshot.
 
 ## Development and release
 

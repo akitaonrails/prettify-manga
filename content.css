@@ -15,6 +15,8 @@ html.pmr-reader-active body > * {
 #pmr-reader-root *::after,
 #pmr-reader-activator,
 #pmr-reader-activator *,
+#pmr-kindle-toolbar,
+#pmr-kindle-toolbar *,
 #pmr-reader-toast {
   box-sizing: border-box !important;
 }
@@ -142,6 +144,22 @@ html.pmr-reader-active body > * {
   filter: sepia(0.48) saturate(0.9) brightness(0.74) contrast(1.12) !important;
 }
 
+html.pmr-kindle-handler-active .pmr-kindle-page-surface {
+  transition: filter 140ms ease !important;
+}
+
+html.pmr-kindle-night-1 .pmr-kindle-page-surface {
+  filter: sepia(0.18) saturate(0.96) brightness(0.92) contrast(1.05) !important;
+}
+
+html.pmr-kindle-night-2 .pmr-kindle-page-surface {
+  filter: sepia(0.32) saturate(0.93) brightness(0.84) contrast(1.08) !important;
+}
+
+html.pmr-kindle-night-3 .pmr-kindle-page-surface {
+  filter: sepia(0.48) saturate(0.9) brightness(0.74) contrast(1.12) !important;
+}
+
 #pmr-reader-root.pmr-mode-double .pmr-spread:not(.pmr-singleton) .pmr-page img,
 #pmr-reader-root.pmr-mode-book .pmr-spread:not(.pmr-singleton) .pmr-page img {
   border-radius: 0 !important;
@@ -223,8 +241,35 @@ html.pmr-reader-active body > * {
   opacity: 1 !important;
 }
 
+#pmr-kindle-toolbar {
+  position: fixed !important;
+  right: 14px !important;
+  bottom: 14px !important;
+  z-index: 2147483646 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  max-width: calc(100vw - 28px) !important;
+  padding: 5px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 999px !important;
+  background: rgba(14, 14, 14, 0.58) !important;
+  color: #f8f8f8 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28) !important;
+  backdrop-filter: blur(12px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(125%) !important;
+  opacity: 0.56 !important;
+  transition: opacity 160ms ease, transform 160ms ease !important;
+}
+
+#pmr-kindle-toolbar:hover,
+#pmr-kindle-toolbar:focus-within {
+  opacity: 0.96 !important;
+}
+
 #pmr-reader-root .pmr-button,
-#pmr-reader-activator .pmr-button {
+#pmr-reader-activator .pmr-button,
+#pmr-kindle-toolbar .pmr-button {
   all: unset !important;
   display: inline-flex !important;
   align-items: center !important;
@@ -244,7 +289,9 @@ html.pmr-reader-active body > * {
 #pmr-reader-root .pmr-button:hover,
 #pmr-reader-root .pmr-button:focus-visible,
 #pmr-reader-activator .pmr-button:hover,
-#pmr-reader-activator .pmr-button:focus-visible {
+#pmr-reader-activator .pmr-button:focus-visible,
+#pmr-kindle-toolbar .pmr-button:hover,
+#pmr-kindle-toolbar .pmr-button:focus-visible {
   background: rgba(255, 255, 255, 0.2) !important;
   outline: 2px solid rgba(255, 255, 255, 0.32) !important;
   outline-offset: 2px !important;

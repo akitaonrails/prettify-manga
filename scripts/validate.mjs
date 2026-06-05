@@ -35,13 +35,19 @@ if (!Array.isArray(manifest.content_scripts) || manifest.content_scripts.length 
   errors.push("Expected one content script declaration");
 }
 
-const contentScript = manifest.content_scripts?.[0];
-if (contentScript) {
+for (const [index, contentScript] of (manifest.content_scripts || []).entries()) {
   for (const file of ["content.js", "content.css"]) {
     const key = file.endsWith(".js") ? "js" : "css";
     if (!contentScript[key]?.includes(file)) {
-      errors.push(`content_scripts must include ${file}`);
+      errors.push(`content_scripts[${index}] must include ${file}`);
     }
+  }
+}
+
+const contentScript = manifest.content_scripts?.[0];
+if (contentScript) {
+  if (!contentScript.all_frames || !contentScript.match_about_blank) {
+    errors.push("Kindle Web Reader support needs all_frames plus match_about_blank");
   }
 }
 
@@ -51,6 +57,37 @@ if (/function\s+preferredImageUrl\b/.test(contentJs)) {
 }
 if (!contentJs.includes("MIN_DETECTED_PAGES") || !contentJs.includes("LANDSCAPE_SPREAD_RATIO")) {
   errors.push("Core heuristic thresholds should be named constants");
+}
+
+const sourceFilesToScan = [
+  ...requiredFiles,
+  "README.md",
+  "CHANGELOG.md",
+  "package.json",
+  "tests/core.test.mjs",
+  "scripts/package.mjs",
+  "scripts/validate.mjs"
+].filter((file) => fs.existsSync(path.join(root, file)));
+
+const forbiddenAmazonSecretMarkers = [
+  ["ubid-main", "="],
+  ["at-main", "="],
+  ["sess-at-main", "="],
+  ["sst-main", "="],
+  ["session-token", "="],
+  ["session-id", "="],
+  ["x-main", "="],
+  ["aws-user", "Info"],
+  ["Atza", "|"]
+].map((parts) => parts.join(""));
+
+for (const file of sourceFilesToScan) {
+  const body = fs.readFileSync(path.join(root, file), "utf8");
+  for (const marker of forbiddenAmazonSecretMarkers) {
+    if (body.includes(marker)) {
+      errors.push(`Potential Amazon session secret marker found in ${file}: ${marker}`);
+    }
+  }
 }
 
 if (errors.length) {

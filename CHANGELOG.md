@@ -1,9 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.2.2
 
 - Added a 4-state night filter: off plus three warmer/dimmer levels for less harsh white pages.
 - Added `N` keyboard shortcut and toolbar button for cycling night filter levels.
+- Added a host-gated Kindle Web Reader manga helper for Amazon/Kindle country reader domains with page-navigation keys and the same night filter.
+- Added a Kindle Web Reader screenshot to the README.
 - Documented night filter usage in the README.
 
 ## 0.2.1
