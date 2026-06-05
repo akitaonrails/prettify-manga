@@ -68,6 +68,8 @@ You can also load this repository directory directly while developing.
 | --- | --- |
 | `Space`, `PageDown`, `Down`, `Right` | Next page/spread |
 | `Shift+Space`, `PageUp`, `Up`, `Left` | Previous page/spread |
+| `Enter` | Next chapter when detected |
+| `Backspace` | Previous chapter when detected |
 | `Home` | Start of chapter |
 | `End` | End of chapter / chapter nav card |
 | `D` | Cycle `Single → Double → Book` |

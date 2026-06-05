@@ -11,6 +11,7 @@
   const KINDLE_TOOLBAR_ID = "pmr-kindle-toolbar";
   const TOAST_ID = "pmr-reader-toast";
   const STORAGE_KEY = "pmr.settings.v1";
+  const CHAPTER_AUTO_OPEN_KEY = "pmr.chapterAutoOpen.v1";
   const DEFAULT_READER_MODE = "book";
   const DEFAULT_NIGHT_MODE = 0;
   const NIGHT_MODE_LEVELS = 3;
@@ -86,6 +87,7 @@
   const ACTIVATOR_MAX_MUTATION_REFRESHES = 12;
   const LAYOUT_REFRESH_DELAY_MS = 80;
   const TOAST_DURATION_MS = 2200;
+  const CHAPTER_AUTO_OPEN_TTL_MS = 90_000;
 
   let settings = {
     mode: DEFAULT_READER_MODE,
@@ -922,7 +924,7 @@
     return { active, pages: pages.length };
   }
 
-  function activateReader() {
+  function activateReader(options = {}) {
     if (mutationObserver) {
       mutationObserver.disconnect();
       mutationObserver = null;
@@ -984,7 +986,9 @@
 
     renderSpreads(0);
     scrollEl.focus({ preventScroll: true });
-    showToast(`Reader on: ${pages.length} pages detected.`);
+    showToast(options.autoOpen
+      ? `Reader reopened in ${MODE_LABELS[settings.mode]} mode.`
+      : `Reader on: ${pages.length} pages detected.`);
   }
 
   function deactivateReader() {
@@ -1046,6 +1050,13 @@
       return;
     }
 
+    const chapterDirection = chapterDirectionFromKey(key);
+    if (chapterDirection) {
+      event.preventDefault();
+      navigateToChapter(chapterDirection);
+      return;
+    }
+
     if (key === "d" || key === "D") {
       event.preventDefault();
       cycleMode();
@@ -1086,6 +1097,28 @@
       event.preventDefault();
       goToSpread(currentSpreadIndex - 1);
     }
+  }
+
+  function chapterDirectionFromKey(key) {
+    if (key === "Enter") {
+      return "next";
+    }
+    if (key === "Backspace") {
+      return "prev";
+    }
+    return "";
+  }
+
+  function navigateToChapter(direction) {
+    const link = chapterNav?.[direction];
+    if (!link?.url) {
+      showToast(`No ${direction === "prev" ? "previous" : "next"} chapter detected.`);
+      return false;
+    }
+
+    armChapterAutoOpen(link.url, direction);
+    location.href = link.url;
+    return true;
   }
 
   function isEditableTarget(target) {
@@ -1264,7 +1297,103 @@
     anchor.rel = rel;
     anchor.textContent = fallbackText;
     anchor.title = link.title || fallbackText;
+    anchor.addEventListener("click", (event) => {
+      if (shouldArmChapterAutoOpenClick(event)) {
+        armChapterAutoOpen(link.url, rel);
+      }
+    });
     return anchor;
+  }
+
+  function shouldArmChapterAutoOpenClick(event) {
+    return !event.defaultPrevented
+      && event.button === 0
+      && !event.metaKey
+      && !event.ctrlKey
+      && !event.shiftKey
+      && !event.altKey;
+  }
+
+  function armChapterAutoOpen(targetUrl, direction = "next") {
+    const intent = chapterAutoOpenIntentForTarget(targetUrl, direction);
+    if (!intent) {
+      return false;
+    }
+    try {
+      window.sessionStorage?.setItem(CHAPTER_AUTO_OPEN_KEY, JSON.stringify(intent));
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function chapterAutoOpenIntentForTarget(targetUrl, direction = "next", now = Date.now(), sourceUrl = location.href) {
+    const source = safeUrl(sourceUrl, location.href);
+    const target = safeUrl(targetUrl, source?.href || location.href);
+    if (!source || !target || target.origin !== source.origin || navigationUrlKey(target) === navigationUrlKey(source)) {
+      return null;
+    }
+    return {
+      targetUrl: target.href,
+      fromUrl: source.href,
+      direction: direction === "prev" ? "prev" : "next",
+      mode: DEFAULT_READER_MODE,
+      expiresAt: now + CHAPTER_AUTO_OPEN_TTL_MS
+    };
+  }
+
+  function readChapterAutoOpenIntent(now = Date.now()) {
+    let raw = "";
+    try {
+      raw = window.sessionStorage?.getItem(CHAPTER_AUTO_OPEN_KEY) || "";
+    } catch (_error) {
+      return null;
+    }
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      const intent = JSON.parse(raw);
+      if (!intent || typeof intent !== "object" || Number(intent.expiresAt) <= now) {
+        clearChapterAutoOpenIntent();
+        return null;
+      }
+      return intent;
+    } catch (_error) {
+      clearChapterAutoOpenIntent();
+      return null;
+    }
+  }
+
+  function shouldConsumeChapterAutoOpenIntent(intent, currentUrl = location.href, now = Date.now()) {
+    if (!intent || typeof intent !== "object" || intent.mode !== DEFAULT_READER_MODE || Number(intent.expiresAt) <= now) {
+      return false;
+    }
+    const current = safeUrl(currentUrl, location.href);
+    const target = safeUrl(intent.targetUrl, current?.href || location.href);
+    return Boolean(current && target && target.origin === current.origin && navigationUrlKey(target) === navigationUrlKey(current));
+  }
+
+  function consumeChapterAutoOpenIntentIfCurrent(intent = readChapterAutoOpenIntent()) {
+    if (!shouldConsumeChapterAutoOpenIntent(intent)) {
+      return false;
+    }
+    clearChapterAutoOpenIntent();
+    return true;
+  }
+
+  function clearChapterAutoOpenIntent() {
+    try {
+      window.sessionStorage?.removeItem(CHAPTER_AUTO_OPEN_KEY);
+    } catch (_error) {
+      // Ignore storage failures; auto-open is best-effort only.
+    }
+  }
+
+  function navigationUrlKey(url) {
+    const pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return `${url.origin}${pathname}${url.search}`;
   }
 
   function isLandscapePage(page) {
@@ -2214,8 +2343,14 @@
     if (active || document.getElementById(ROOT_ID)) {
       return;
     }
-    const detected = collectMangaPages({ includeEmbedded: false });
+    const autoOpenIntent = readChapterAutoOpenIntent();
+    const shouldAutoOpen = shouldConsumeChapterAutoOpenIntent(autoOpenIntent);
+    const detected = collectMangaPages({ includeEmbedded: shouldAutoOpen });
     if (detected.length >= MIN_DETECTED_PAGES) {
+      if (shouldAutoOpen && consumeChapterAutoOpenIntentIfCurrent(autoOpenIntent)) {
+        activateReader({ autoOpen: true });
+        return;
+      }
       showActivator(detected.length);
     } else {
       removeActivator();
@@ -2283,6 +2418,7 @@
         <ul>
           <li><kbd>Space</kbd>, <kbd>PageDown</kbd>, <kbd>↓</kbd>, <kbd>→</kbd>: next page/spread</li>
           <li><kbd>Shift</kbd> + <kbd>Space</kbd>, <kbd>PageUp</kbd>, <kbd>↑</kbd>, <kbd>←</kbd>: previous page/spread</li>
+          <li><kbd>Enter</kbd>: next chapter, <kbd>Backspace</kbd>: previous chapter</li>
           <li><kbd>Home</kbd> / <kbd>End</kbd>: chapter start/end</li>
           <li><kbd>D</kbd>: cycle Single → Double → Book spread mode</li>
           <li><kbd>S</kbd>: toggle scroll snapping</li>
@@ -2304,8 +2440,11 @@
       buildSpreads,
       chapterInfoFromText,
       chapterInfoFromUrl,
+      chapterAutoOpenIntentForTarget,
+      chapterDirectionFromKey,
       isKindleMangaReaderPage,
       kindleNavigationPlanFromKey,
+      shouldConsumeChapterAutoOpenIntent,
       visualPageIndexesForSpread,
       isBadChapterNavLink,
       isLandscapePage,

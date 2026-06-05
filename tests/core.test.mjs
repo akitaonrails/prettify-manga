@@ -158,6 +158,29 @@ test("chapter URL parsing treats hyphenated subchapters as decimals", () => {
   assert.equal(chapter715.family, chapter72.family);
 });
 
+test("chapter auto-open intent is same-tab, same-origin, and one-shot", () => {
+  const api = loadApi();
+  const now = 1_000;
+  const currentUrl = "https://example.test/manga/series-chapter-10/";
+  const targetUrl = "https://example.test/manga/series-chapter-11/";
+  const intent = api.chapterAutoOpenIntentForTarget(targetUrl, "next", now, currentUrl);
+
+  assert.equal(intent.mode, api.DEFAULT_READER_MODE);
+  assert.equal(intent.direction, "next");
+  assert.equal(api.shouldConsumeChapterAutoOpenIntent(intent, "https://example.test/manga/series-chapter-11/#page", now + 1), true);
+  assert.equal(api.shouldConsumeChapterAutoOpenIntent(intent, "https://example.test/manga/series-chapter-12/", now + 1), false);
+  assert.equal(api.shouldConsumeChapterAutoOpenIntent(intent, targetUrl, intent.expiresAt + 1), false);
+  assert.equal(api.chapterAutoOpenIntentForTarget("https://other.test/manga/series-chapter-11/", "next", now, currentUrl), null);
+  assert.equal(api.chapterAutoOpenIntentForTarget(currentUrl, "next", now, currentUrl), null);
+});
+
+test("chapter keyboard shortcuts map enter and backspace to chapter navigation", () => {
+  const api = loadApi();
+  assert.equal(api.chapterDirectionFromKey("Enter"), "next");
+  assert.equal(api.chapterDirectionFromKey("Backspace"), "prev");
+  assert.equal(api.chapterDirectionFromKey("PageDown"), "");
+});
+
 test("chapter nav bad-link filter rejects ads, feeds, and social links", () => {
   const api = loadApi();
   assert.equal(api.isBadChapterNavLink(new URL("https://example.test/feed/"), "Next", ""), true);

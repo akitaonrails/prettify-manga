@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- Reopen the reader automatically in Book mode after using the reader's previous/next chapter links.
+- Added `Enter` for next chapter and `Backspace` for previous chapter while the reader is active.
+
 ## 0.3.0
 
 - Fixed chapter navigation scoring for hyphenated subchapters like `chapter-71-5`, treating them as `71.5` instead of `71`.
