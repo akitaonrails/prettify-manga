@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2
+
+- Added extra spacing between help dialog shortcut list items.
+- Let page navigation shortcuts continue into adjacent chapters at chapter boundaries: next keys load the next chapter at the end, previous keys load the previous chapter at the start.
+
 ## 0.3.1
 
 - Reopen the reader automatically in Book mode after using the reader's previous/next chapter links.

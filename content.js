@@ -1087,16 +1087,56 @@
       return;
     }
 
-    if (key === "PageDown" || key === "ArrowDown" || key === "ArrowRight" || (key === " " && !event.shiftKey)) {
+    const pageIntent = pageNavigationIntentFromKey(key, event.shiftKey, currentSpreadIndex, spreads);
+    if (pageIntent) {
       event.preventDefault();
-      goToSpread(currentSpreadIndex + 1);
-      return;
+      if (pageIntent.type === "chapter") {
+        navigateToChapter(pageIntent.direction);
+      } else {
+        goToSpread(currentSpreadIndex + pageIntent.delta);
+      }
     }
+  }
 
-    if (key === "PageUp" || key === "ArrowUp" || key === "ArrowLeft" || (key === " " && event.shiftKey)) {
-      event.preventDefault();
-      goToSpread(currentSpreadIndex - 1);
+  function pageNavigationIntentFromKey(key, shiftKey = false, spreadIndex = currentSpreadIndex, spreadList = spreads, nav = chapterNav) {
+    const direction = pageDirectionFromKey(key, shiftKey);
+    if (!direction) {
+      return null;
     }
+    if (shouldNavigateChapterAtBoundary(direction, spreadIndex, spreadList, nav)) {
+      return { type: "chapter", direction };
+    }
+    return { type: "spread", delta: direction === "next" ? 1 : -1 };
+  }
+
+  function pageDirectionFromKey(key, shiftKey = false) {
+    if (key === "PageDown" || key === "ArrowDown" || key === "ArrowRight" || (key === " " && !shiftKey)) {
+      return "next";
+    }
+    if (key === "PageUp" || key === "ArrowUp" || key === "ArrowLeft" || (key === " " && shiftKey)) {
+      return "prev";
+    }
+    return "";
+  }
+
+  function shouldNavigateChapterAtBoundary(direction, spreadIndex = currentSpreadIndex, spreadList = spreads, nav = chapterNav) {
+    if (!nav?.[direction]?.url) {
+      return false;
+    }
+    if (direction === "prev") {
+      return spreadIndex <= 0;
+    }
+    const lastReadingSpread = lastReadableSpreadIndex(spreadList);
+    return lastReadingSpread >= 0 && spreadIndex >= lastReadingSpread;
+  }
+
+  function lastReadableSpreadIndex(spreadList = spreads) {
+    for (let index = spreadList.length - 1; index >= 0; index -= 1) {
+      if (spreadList[index]?.type !== "chapter-nav") {
+        return index;
+      }
+    }
+    return -1;
   }
 
   function chapterDirectionFromKey(key) {
@@ -2416,8 +2456,8 @@
         <h2>Prettify Manga Reader</h2>
         <p>The extension builds this view from detected page-image sequences instead of site-specific selectors.</p>
         <ul>
-          <li><kbd>Space</kbd>, <kbd>PageDown</kbd>, <kbd>↓</kbd>, <kbd>→</kbd>: next page/spread</li>
-          <li><kbd>Shift</kbd> + <kbd>Space</kbd>, <kbd>PageUp</kbd>, <kbd>↑</kbd>, <kbd>←</kbd>: previous page/spread</li>
+          <li><kbd>Space</kbd>, <kbd>PageDown</kbd>, <kbd>↓</kbd>, <kbd>→</kbd>: next page/spread, then next chapter at the end</li>
+          <li><kbd>Shift</kbd> + <kbd>Space</kbd>, <kbd>PageUp</kbd>, <kbd>↑</kbd>, <kbd>←</kbd>: previous page/spread, then previous chapter at the start</li>
           <li><kbd>Enter</kbd>: next chapter, <kbd>Backspace</kbd>: previous chapter</li>
           <li><kbd>Home</kbd> / <kbd>End</kbd>: chapter start/end</li>
           <li><kbd>D</kbd>: cycle Single → Double → Book spread mode</li>
@@ -2444,6 +2484,7 @@
       chapterDirectionFromKey,
       isKindleMangaReaderPage,
       kindleNavigationPlanFromKey,
+      pageNavigationIntentFromKey,
       shouldConsumeChapterAutoOpenIntent,
       visualPageIndexesForSpread,
       isBadChapterNavLink,

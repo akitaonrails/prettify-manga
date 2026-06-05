@@ -357,6 +357,14 @@ html.pmr-kindle-night-3 .pmr-kindle-page-surface {
   padding-left: 22px !important;
 }
 
+#pmr-reader-root .pmr-help-dialog li {
+  margin-bottom: 8px !important;
+}
+
+#pmr-reader-root .pmr-help-dialog li:last-child {
+  margin-bottom: 0 !important;
+}
+
 #pmr-reader-root .pmr-help-dialog kbd {
   display: inline-block !important;
   min-width: 1.65em !important;

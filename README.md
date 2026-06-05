@@ -66,8 +66,8 @@ You can also load this repository directory directly while developing.
 
 | Shortcut | Action |
 | --- | --- |
-| `Space`, `PageDown`, `Down`, `Right` | Next page/spread |
-| `Shift+Space`, `PageUp`, `Up`, `Left` | Previous page/spread |
+| `Space`, `PageDown`, `Down`, `Right` | Next page/spread; next chapter at the end |
+| `Shift+Space`, `PageUp`, `Up`, `Left` | Previous page/spread; previous chapter at the start |
 | `Enter` | Next chapter when detected |
 | `Backspace` | Previous chapter when detected |
 | `Home` | Start of chapter |

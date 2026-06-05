@@ -181,6 +181,21 @@ test("chapter keyboard shortcuts map enter and backspace to chapter navigation",
   assert.equal(api.chapterDirectionFromKey("PageDown"), "");
 });
 
+test("page navigation shortcuts continue to adjacent chapters at boundaries", () => {
+  const api = loadApi();
+  const spreadList = [{ pageIndexes: [0] }, { pageIndexes: [1, 2] }, { type: "chapter-nav", pageIndexes: [] }];
+  const nav = {
+    prev: { url: "https://example.test/manga/series-chapter-9/" },
+    next: { url: "https://example.test/manga/series-chapter-11/" }
+  };
+
+  assert.deepEqual(plain(api.pageNavigationIntentFromKey(" ", false, 0, spreadList, nav)), { type: "spread", delta: 1 });
+  assert.deepEqual(plain(api.pageNavigationIntentFromKey(" ", false, 1, spreadList, nav)), { type: "chapter", direction: "next" });
+  assert.deepEqual(plain(api.pageNavigationIntentFromKey(" ", false, 2, spreadList, nav)), { type: "chapter", direction: "next" });
+  assert.deepEqual(plain(api.pageNavigationIntentFromKey("PageUp", false, 0, spreadList, nav)), { type: "chapter", direction: "prev" });
+  assert.deepEqual(plain(api.pageNavigationIntentFromKey("PageUp", false, 1, spreadList, nav)), { type: "spread", delta: -1 });
+});
+
 test("chapter nav bad-link filter rejects ads, feeds, and social links", () => {
   const api = loadApi();
   assert.equal(api.isBadChapterNavLink(new URL("https://example.test/feed/"), "Next", ""), true);
