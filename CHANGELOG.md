@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Added a MangaDex adapter for `mangadex.org/chapter/<uuid>` pages using MangaDex's at-home page list API.
+- Rebuilds MangaDex page-click chapters in the Book/Double/Single overlay and starts at the URL page number.
+- Added MangaDex previous/next chapter handling, auto-open URL normalization, README notes, and regression tests.
+
 ## 0.3.2
 
 - Added extra spacing between help dialog shortcut list items.

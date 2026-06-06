@@ -8,7 +8,7 @@ Did you know many manga artists compose key moments as two-page spreads? If you 
 
 Prettify Manga Reader restores more of the artist's original intent. It turns ugly, ad-bloated manga websites into a modern dark-mode reader with fitted pages, joined two-page spreads, keyboard navigation, and clean controls. It is generic by design, so it works across most manga sites instead of being hardcoded to one domain.
 
-It also includes a small Kindle Web Reader helper for manga opened on country reader domains such as `read.amazon.com`, `read.amazon.co.jp`, `read.amazon.co.uk`, and matching `read.kindle.*` hosts.
+It also includes MangaDex reader support and a small Kindle Web Reader helper for manga opened on country reader domains such as `read.amazon.com`, `read.amazon.co.jp`, `read.amazon.co.uk`, and matching `read.kindle.*` hosts.
 
 ## Before: the usual fansub page
 
@@ -34,6 +34,7 @@ The extension opens a dark overlay, fits the art to the viewport, and joins page
 - Adds a 3-level night filter to soften harsh white manga pages without flattening contrast.
 - Adds keyboard shortcuts and small mouse controls.
 - Adds an end-of-chapter card with detected previous/next chapter links when confidence is high.
+- Rebuilds MangaDex chapters from MangaDex's at-home page list so page-click readers can use the same Book/Double/Single overlay.
 - Adds Kindle Web Reader manga shortcuts and a small night-filter toolbar on Amazon/Kindle country reader domains.
 
 ## Install locally
@@ -91,6 +92,12 @@ While the reader is active, the original page is not deleted. It is hidden and s
 ## Night filter
 
 Press `N` or click the **Night** toolbar button to cycle through three warmer, dimmer image filters. The filters use sepia, brightness, and contrast adjustments to make white pages less harsh without turning manga art into a flat gray wash.
+
+## MangaDex support
+
+On `mangadex.org/chapter/<uuid>` pages, MangaDex normally renders only the current page and nearby pages. Prettify Manga Reader uses MangaDex's public at-home chapter page list to build the full chapter inside the overlay, then starts at the page number from the URL, such as `/5` for page 5.
+
+The MangaDex adapter is host-gated to `mangadex.org` chapter URLs and does not send credentials to MangaDex image servers.
 
 ## Kindle Web Reader manga support
 

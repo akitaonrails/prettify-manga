@@ -70,6 +70,26 @@ test("kindle manga handler is gated to country reader manga paths", () => {
   assert.equal(api.isKindleMangaReaderPage({ hostname: "www.amazon.com", pathname: "/manga/B08FBPPCHM" }), false);
 });
 
+test("MangaDex reader handler is gated to chapter UUID paths", () => {
+  const api = loadApi();
+  assert.equal(api.isMangaDexReaderPage("https://mangadex.org/chapter/7e13cbbf-446c-4007-b761-566bddd9d8fa/5"), true);
+  assert.equal(api.isMangaDexReaderPage("https://mangadex.org/chapter/7e13cbbf-446c-4007-b761-566bddd9d8fa"), true);
+  assert.equal(api.isMangaDexReaderPage("https://mangadex.org/title/65263bf9-4f87-4513-b72f-ad6436b3911c"), false);
+  assert.equal(api.isMangaDexReaderPage("https://mangadex.org.evil.test/chapter/7e13cbbf-446c-4007-b761-566bddd9d8fa/5"), false);
+});
+
+test("MangaDex chapter URL parsing extracts UUID and page number", () => {
+  const api = loadApi();
+  assert.deepEqual(
+    plain(api.mangaDexChapterInfoFromUrl("https://mangadex.org/chapter/7e13cbbf-446c-4007-b761-566bddd9d8fa/5")),
+    { chapterId: "7e13cbbf-446c-4007-b761-566bddd9d8fa", pageNumber: 5 }
+  );
+  assert.deepEqual(
+    plain(api.mangaDexChapterInfoFromUrl("https://mangadex.org/chapter/7e13cbbf-446c-4007-b761-566bddd9d8fa")),
+    { chapterId: "7e13cbbf-446c-4007-b761-566bddd9d8fa", pageNumber: 1 }
+  );
+});
+
 test("kindle key bindings map to page navigation intents", () => {
   const api = loadApi();
   assert.deepEqual(plain(api.kindleNavigationPlanFromKey("PageDown")), { action: "next", nativeKey: "PageDown", wheelDirection: 1 });
@@ -172,6 +192,29 @@ test("chapter auto-open intent is same-tab, same-origin, and one-shot", () => {
   assert.equal(api.shouldConsumeChapterAutoOpenIntent(intent, targetUrl, intent.expiresAt + 1), false);
   assert.equal(api.chapterAutoOpenIntentForTarget("https://other.test/manga/series-chapter-11/", "next", now, currentUrl), null);
   assert.equal(api.chapterAutoOpenIntentForTarget(currentUrl, "next", now, currentUrl), null);
+});
+
+test("MangaDex chapter auto-open ignores page suffixes", () => {
+  const api = loadApi();
+  const current = new URL("https://mangadex.org/chapter/7e13cbbf-446c-4007-b761-566bddd9d8fa/5");
+  const target = new URL("https://mangadex.org/chapter/7e13cbbf-446c-4007-b761-566bddd9d8fa");
+  assert.equal(api.navigationUrlKey(current), api.navigationUrlKey(target));
+});
+
+test("MangaDex at-home response maps to ordered page URLs", () => {
+  const api = loadApi();
+  const pages = api.mangaDexPagesFromAtHomeData({
+    baseUrl: "https://node.mangadex.network/",
+    chapter: {
+      hash: "abc123",
+      data: ["1-a.png", "2-b.jpg", "3-c.gif"]
+    }
+  });
+  assert.deepEqual(plain(pages.map((page) => ({ url: page.url, pageNumber: page.pageNumber }))), [
+    { url: "https://node.mangadex.network/data/abc123/1-a.png", pageNumber: 1 },
+    { url: "https://node.mangadex.network/data/abc123/2-b.jpg", pageNumber: 2 },
+    { url: "https://node.mangadex.network/data/abc123/3-c.gif", pageNumber: 3 }
+  ]);
 });
 
 test("chapter keyboard shortcuts map enter and backspace to chapter navigation", () => {
